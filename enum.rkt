@@ -234,28 +234,55 @@
 ;; prod : Enum a, Enum b -> Enum (a,b)
 (define (prod/enum e1 e2)
   (cond [(not (infinite? (Enum-size e1)))
-	 (if (not (infinite? (Enum-size e2)))
-	     (let [(size (* (Enum-size e1)
-			    (Enum-size e2)))]
-	       (Enum size
-		     (λ (n) ;; bijection from n -> axb
-			(if (> n size)
-			    (error "out of range")
-			    (call-with-values
-				(λ ()
-				   (quotient/remainder n (Enum-size e1)))
-			      (λ (q r)
-				 (cons ((Enum-from e1) q)
-				       ((Enum-from e2) r))))))
-		     (λ (x)
-			(unless (pair? x)
-			  (error "not a list"))
-			(+ (* (Enum-size e1)
-			      ((Enum-to e1) (car x)))
-			   ((Enum-to e2) (cdr x))))))
-	     (error 'unimpl))]
+	 (cond [(not (infinite? (Enum-size e2)))
+		(let [(size (* (Enum-size e1)
+			       (Enum-size e2)))]
+		  (Enum size
+			(λ (n) ;; bijection from n -> axb
+			   (if (> n size)
+			       (error "out of range")
+			       (call-with-values
+				   (λ ()
+				      (quotient/remainder n (Enum-size e1)))
+				 (λ (q r)
+				    (cons ((Enum-from e1) q)
+					  ((Enum-from e2) r))))))
+			(λ (xs)
+			   (unless (pair? xs)
+			     (error "not a pair"))
+			   (+ (* (Enum-size e1)
+				 ((Enum-to e1) (car xs)))
+			      ((Enum-to e2) (cdr xs))))))]
+	       [else
+		(Enum +inf.f
+		      (λ (n)
+			 (call-with-values
+			     (λ ()
+				(quotient/remainder n (Enum-size e1)))
+			   (λ (q r)
+			      (cons ((Enum-from e1) r)
+				    ((Enum-from e2) q)))))
+		      (λ (xs)
+			 (unless (pair? xs)
+			   (error "not a pair"))
+			 (+ ((Enum-to e1) (car xs))
+			    (* (Enum-size e1)
+			       ((Enum-to e2) (cdr xs))))))])]
 	[(not (infinite? (Enum-size e2)))
-	 (prod/enum e2 e1)]
+	 (Enum +inf.f
+	       (λ (n)
+		  (call-with-values
+		      (λ ()
+			 (quotient/remainder n (Enum-size e2)))
+		    (λ (q r)
+		       (cons ((Enum-from e1) q)
+			     ((Enum-from e2) r)))))
+	       (λ (xs)
+		  (unless (pair? xs)
+		    (error "not a pair"))
+		  (+ (* (Enum-size e2)
+			((Enum-to e1) (car xs)))
+		     ((Enum-to e2) (cdr xs)))))]
 	[else
 	 (Enum (* (Enum-size e1)
 		  (Enum-size e2))
@@ -290,7 +317,8 @@
 ;; prod tests
 (test-begin
  (let ([bool*bool (prod/enum bools bools)]
-       #;[bool*nats (prod/enum bools nats)]
+       [bool*nats (prod/enum bools nats)]
+       [nats*bool (prod/enum nats bools)]
        [nats*nats (prod/enum nats nats)]
        [ns-equal? (λ (ns ms)
 		     (and (= (car ns)
@@ -302,9 +330,33 @@
                  (cons #t #t))
    (check-equal? (decode bool*bool 1)
                  (cons #t #f))
-   (check-equal? (encode bool*bool (cons #t #t)) 0)
-   (check-equal? (encode bool*bool (cons #t #f)) 1)
+   (check-equal? (decode bool*bool 2)
+                 (cons #f #t))
+   (check-equal? (decode bool*bool 3)
+                 (cons #f #f))
    (check-bijection? bool*bool)
+
+   (check-equal? (Enum-size bool*nats) +inf.f)
+   (check-equal? (decode bool*nats 0)
+		 (cons #t 0))
+   (check-equal? (decode bool*nats 1)
+		 (cons #f 0))
+   (check-equal? (decode bool*nats 2)
+		 (cons #t 1))
+   (check-equal? (decode bool*nats 3)
+		 (cons #f 1))
+   (check-bijection? bool*nats)
+
+   (check-equal? (Enum-size nats*bool) +inf.f)
+   (check-equal? (decode nats*bool 0)
+		 (cons 0 #t))
+   (check-equal? (decode nats*bool 1)
+		 (cons 0 #f))
+   (check-equal? (decode nats*bool 2)
+		 (cons 1 #t))
+   (check-equal? (decode nats*bool 3)
+		 (cons 1 #f))
+   (check-bijection? nats*bool)
 
    (check-equal? (Enum-size nats*nats) +inf.f)
    (check ns-equal?
