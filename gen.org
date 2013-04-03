@@ -1,0 +1,5 @@
+* Generator type: Gen a = < Nat or Inf, Nat -> a, a -> Nat >
+  - Const :: a -> Gen a
+  - Sum :: Gen a -> Gen b -> Gen (a or b)
+  - Prod :: Gen a -> Gen b -> Gen (a,b)
+  - DepGen :: Gen a -> (a -> Gen b) -> Gen (a,b)
