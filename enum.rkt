@@ -216,7 +216,7 @@
 	(λ (n)
 	   ;; calculate the k for which (tri k) is the greatest
 	   ;; triangle number <= n
-	   (let* ([k (floor (untri n))]
+	   (let* ([k (floor-untri n)]
 		  [t (tri k)]
 		  [l (- n t)]
 		  [m (- k l)])
@@ -287,7 +287,7 @@
 	 (Enum (* (Enum-size e1)
 		  (Enum-size e2))
 	       (λ (n)
-		  (let* ([k (floor (untri n))]
+		  (let* ([k (floor-untri n)]
 			 [t (tri k)]
 			 [l (- n t)]
 			 [m (- k l)])
@@ -307,12 +307,17 @@
 (define (tri n)
   (/ (* n (+ n 1))
      2))
-;; the inverse of tri (use floor o untri to find largest tri number
-;; less than k)
-(define (untri k)
-  (/ (+ (- 1)
-	(sqrt (+ 1 (* 8 k))))
-     2))
+
+;; the floor of the inverse of tri
+;; returns the largest triangle number less than k
+;; always returns an integer
+(define (floor-untri k)
+  (let ([n (integer-sqrt (+ 1 (* 8 k)))])
+    (/ (- n 
+          (if (even? n)
+              2
+              1))
+       2)))
 
 ;; prod tests
 (test-begin
