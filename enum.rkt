@@ -5,6 +5,10 @@
 (struct Enum
   (size from to))
 
+;; size : Enum a -> Nat or +Inf
+(define (size e)
+  (Enum-size e))
+
 ;; decode : Enum a, Nat -> a
 (define (decode e n)
   (if (and (< n (Enum-size e))
@@ -15,6 +19,44 @@
 ;; encode : Enum a, a -> Nat
 (define (encode e a)
   ((Enum-to e) a))
+
+;; Helper functions
+;; map/enum : Enum a, (a -> b), (b -> a) -> Enum b
+(define (map/enum e f inv-f)
+  (Enum (size e)
+	(compose f (Enum-from e))
+	(compose (Enum-to e) inv-f)))
+
+;; to-list : Enum a -> listof a
+;; better be finite
+(define (to-list e)
+  (when (infinite? (size e))
+    (error 'too-big))
+  (map (Enum-from e)
+       (stream->list (in-range (size e)))))
+
+;; take/enum : Enum a, Nat -> Enum a
+;; returns an enum of the first n parts of e
+;; n must be less than or equal to size e
+(define (take/enum e n)
+  (unless (or (infinite? (size e))
+	      (<= n (size e)))
+    (error 'too-big))
+  (Enum n
+	(λ (k)
+	   (unless (< k n)
+	     (error 'out-of-range))
+	   (decode e k))
+	(λ (x)
+	   (let ([k (encode e x)])
+	     (unless (< k n)
+	       (error 'out-of-range))
+	     k))))
+
+;; foldl-enum : Enum a, b, (a,b -> b) -> b
+;; better be a finite enum
+(define (foldl-enum f id e)
+  (foldl f id (to-list e)))
 
 (define (const c)
   (Enum 1
@@ -52,7 +94,7 @@
                 (encode e 0)))
    (check-bijection? e)))
 
-;; from-list :: Lisof a -> Gen a
+;; list/enum :: Lisof a -> Gen a
 ;; input list should not contain duplicates
 (define (list/enum l)
   (Enum (length l)
@@ -70,7 +112,7 @@
          (cons (car l)
             (take-while (cdr l) pred))]))
 
-;; from-list tests
+;; list/enum tests
 (test-begin
  (let [(e (list/enum '(5 4 1 8)))]
    (check-eq? (decode e 0) 5)
@@ -89,7 +131,10 @@
 (define nats
   (Enum +inf.f
         identity
-        identity))
+        (λ (n)
+	   (unless (>= n 0)
+	     (error 'out-of-range))
+	   n)))
 (define ints
   (Enum +inf.f
         (λ (n)
@@ -231,7 +276,7 @@
 		l))) ;; (n,m) -> (n+m)(n+m+1)/2 + n
 	))
 
-;; prod : Enum a, Enum b -> Enum (a,b)
+;; prod/enum : Enum a, Enum b -> Enum (a,b)
 (define (prod/enum e1 e2)
   (cond [(not (infinite? (Enum-size e1)))
 	 (cond [(not (infinite? (Enum-size e2)))
@@ -319,64 +364,169 @@
               1))
        2)))
 
+(define bool*bool (prod/enum bools bools))
+(define bool*nats (prod/enum bools nats))
+(define nats*bool (prod/enum nats bools))
+(define nats*nats (prod/enum nats nats))
+(define ns-equal? (λ (ns ms)
+	      (and (= (car ns)
+		      (car ms))
+		   (= (cdr ns)
+		      (cdr ms)))))
+
 ;; prod tests
 (test-begin
- (let ([bool*bool (prod/enum bools bools)]
-       [bool*nats (prod/enum bools nats)]
-       [nats*bool (prod/enum nats bools)]
-       [nats*nats (prod/enum nats nats)]
-       [ns-equal? (λ (ns ms)
-		     (and (= (car ns)
-			     (car ms))
-			  (= (cdr ns)
-			     (cdr ms))))])
-   (check-equal? (Enum-size bool*bool) 4)
-   (check-equal? (decode bool*bool 0)
-                 (cons #t #t))
-   (check-equal? (decode bool*bool 1)
-                 (cons #t #f))
-   (check-equal? (decode bool*bool 2)
-                 (cons #f #t))
-   (check-equal? (decode bool*bool 3)
-                 (cons #f #f))
-   (check-bijection? bool*bool)
+ 
+ (check-equal? (Enum-size bool*bool) 4)
+ (check-equal? (decode bool*bool 0)
+	       (cons #t #t))
+ (check-equal? (decode bool*bool 1)
+	       (cons #t #f))
+ (check-equal? (decode bool*bool 2)
+	       (cons #f #t))
+ (check-equal? (decode bool*bool 3)
+	       (cons #f #f))
+ (check-bijection? bool*bool)
 
-   (check-equal? (Enum-size bool*nats) +inf.f)
-   (check-equal? (decode bool*nats 0)
-		 (cons #t 0))
-   (check-equal? (decode bool*nats 1)
-		 (cons #f 0))
-   (check-equal? (decode bool*nats 2)
-		 (cons #t 1))
-   (check-equal? (decode bool*nats 3)
-		 (cons #f 1))
-   (check-bijection? bool*nats)
+ (check-equal? (Enum-size bool*nats) +inf.f)
+ (check-equal? (decode bool*nats 0)
+	       (cons #t 0))
+ (check-equal? (decode bool*nats 1)
+	       (cons #f 0))
+ (check-equal? (decode bool*nats 2)
+	       (cons #t 1))
+ (check-equal? (decode bool*nats 3)
+	       (cons #f 1))
+ (check-bijection? bool*nats)
 
-   (check-equal? (Enum-size nats*bool) +inf.f)
-   (check-equal? (decode nats*bool 0)
-		 (cons 0 #t))
-   (check-equal? (decode nats*bool 1)
-		 (cons 0 #f))
-   (check-equal? (decode nats*bool 2)
-		 (cons 1 #t))
-   (check-equal? (decode nats*bool 3)
-		 (cons 1 #f))
-   (check-bijection? nats*bool)
+ (check-equal? (Enum-size nats*bool) +inf.f)
+ (check-equal? (decode nats*bool 0)
+	       (cons 0 #t))
+ (check-equal? (decode nats*bool 1)
+	       (cons 0 #f))
+ (check-equal? (decode nats*bool 2)
+	       (cons 1 #t))
+ (check-equal? (decode nats*bool 3)
+	       (cons 1 #f))
+ (check-bijection? nats*bool)
 
-   (check-equal? (Enum-size nats*nats) +inf.f)
-   (check ns-equal?
-	  (decode nats*nats 0)
-	  (cons 0 0))
-   (check ns-equal?
-	  (decode nats*nats 1)
-	  (cons 0 1))
-   (check ns-equal?
-	  (decode nats*nats 2)
-	  (cons 1 0))
-   (check ns-equal?
-	  (decode nats*nats 3)
-	  (cons 0 2))
-   (check ns-equal?
-	  (decode nats*nats 4)
-	  (cons 1 1))
-   (check-bijection? nats*nats)))
+ (check-equal? (Enum-size nats*nats) +inf.f)
+ (check ns-equal?
+	(decode nats*nats 0)
+	(cons 0 0))
+ (check ns-equal?
+	(decode nats*nats 1)
+	(cons 0 1))
+ (check ns-equal?
+	(decode nats*nats 2)
+	(cons 1 0))
+ (check ns-equal?
+	(decode nats*nats 3)
+	(cons 0 2))
+ (check ns-equal?
+	(decode nats*nats 4)
+	(cons 1 1))
+ (check-bijection? nats*nats))
+
+;; dep/enum : Enum a, (a -> Enum b) -> Enum (a,b)
+(define (dep/enum e f)
+  (cond [(not (infinite? (size e)))
+	 (cond [(not (infinite? (size (f (decode e 0)))))
+		(let ([s (foldl + 0 (map (compose size f) (to-list e)))])
+		  (Enum s
+			(λ (n) ;; n -> axb
+			   (let loop ([ei 0]
+				      [seen 0])
+			     (let* ([a (decode e ei)]
+				    [e2 (f a)])
+			       (if (< (- n seen)
+				      (size e2))
+				   (cons a (decode e2 (- n seen)))
+				   (loop (+ ei 1)
+					 (+ seen (size e2)))))))
+			(λ (ab) ;; axb -> n
+			   (let ([ai (encode e (car ab))])
+			     (+ (let loop ([i 0]
+					   [sum 0])
+				  (if (>= i ai)
+				      sum
+				      (loop (+ i 1)
+					    (+ sum
+					       (size (f (decode e i)))))))
+				(encode (f (car ab))
+					(cdr ab)))))))]
+	       ;; finite e, infinite (f e)s
+	       [else (Enum +inf.f
+			   (λ (n)
+			      (call-with-values
+				  (λ ()
+				     (quotient/remainder n (size e)))
+				(λ (q r)
+				   (cons (decode e r)
+					 (decode (f (decode e r)) q)))))
+			   (λ (ab)
+			      (+ (* (size e) (encode (f (car ab)) (cdr ab)))
+				 (encode e (car ab)))))])]
+	(error 'unimpl)))
+
+(define (up-to n)
+  (take/enum nats (+ n 1)))
+
+(define n-up
+  (dep/enum (list/enum '(0 1 2))
+	    up-to))
+
+;; map test
+(define (nats+ n)
+  (map/enum nats
+	    (λ (k)
+	       (+ k n))
+	    (λ (k)
+	       (- k n))))
+(define nats+1 (nats+ 1))
+(test-begin
+ (check-equal? (size nats+1) +inf.f)
+ (check-equal? (decode nats+1 0) 1)
+ (check-equal? (decode nats+1 1) 2)
+ (check-bijection? nats+1))
+
+(define from-n
+  (dep/enum (list/enum '(0 1 2))
+	    nats+))
+
+(test-begin
+ (check-equal? (size n-up) 6)
+ (check-equal? (decode n-up 0) (cons 0 0))
+ (check-equal? (decode n-up 1) (cons 1 0))
+ (check-equal? (decode n-up 2) (cons 1 1))
+ (check-equal? (decode n-up 3) (cons 2 0))
+ (check-equal? (decode n-up 4) (cons 2 1))
+ (check-equal? (decode n-up 5) (cons 2 2))
+ (check-bijection? n-up)
+
+ (check-equal? (size from-n) +inf.f)
+ (check-equal? (decode from-n 0) (cons 0 0))
+ (check-equal? (decode from-n 1) (cons 1 1))
+ (check-equal? (decode from-n 2) (cons 2 2))
+ (check-equal? (decode from-n 3) (cons 0 1))
+ (check-equal? (decode from-n 4) (cons 1 2))
+ (check-equal? (decode from-n 5) (cons 2 3))
+ (check-equal? (decode from-n 6) (cons 0 2))
+ (check-bijection? from-n))
+
+
+;; take/enum test
+(define to-2 (up-to 2))
+(test-begin
+ (check-equal? (size to-2) 3)
+ (check-equal? (decode to-2 0) 0)
+ (check-equal? (decode to-2 1) 1)
+ (check-equal? (decode to-2 2) 2)
+ (check-bijection? to-2))
+
+;; to-list, foldl test
+(test-begin
+ (check-equal? (to-list (up-to 3))
+	       '(0 1 2 3))
+ (check-equal? (foldl-enum cons '() (up-to 3))
+	       '(3 2 1 0)))
