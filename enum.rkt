@@ -1,9 +1,31 @@
 #lang racket
 (require rackunit)
 
+(provide Enum
+	 size
+	 encode
+	 decode
+	 empty/enum
+	 const/enum
+	 list/enum
+	 sum/enum
+	 prod/enum
+	 dep/enum
+	 map/enum
+	 
+	 to-list
+	 take/enum
+	 foldl-enum
+
+	 nats
+	 range/enum
+	 thunk/enum
+	 nats+/enum)
+
 ;; an Enum a is a struct of < Nat or +Inf, Nat -> a, a -> Nat >
 (struct Enum
-  (size from to))
+	(size from to)
+	#:prefab)
 
 ;; size : Enum a -> Nat or +Inf
 (define (size e)
@@ -21,8 +43,8 @@
   ((Enum-to e) a))
 
 ;; Helper functions
-;; map/enum : Enum a, (a -> b), (b -> a) -> Enum b
-(define (map/enum e f inv-f)
+;; map/enum : (a -> b), (b -> a), Enum a -> Enum b
+(define (map/enum f inv-f e)
   (Enum (size e)
 	(compose f (Enum-from e))
 	(compose (Enum-to e) inv-f)))
@@ -58,7 +80,14 @@
 (define (foldl-enum f id e)
   (foldl f id (to-list e)))
 
-(define (const c)
+(define empty/enum
+  (Enum 0
+	(λ (n)
+	   (error 'empty))
+	(λ (x)
+	   (error 'empty))))
+
+(define (const/enum c)
   (Enum 1
         (λ (n)
           c)
@@ -67,16 +96,17 @@
               0
               (error 'bad-val)))))
 
-
 ;; list/enum :: Lisof a -> Gen a
 ;; input list should not contain duplicates
 (define (list/enum l)
-  (Enum (length l)
-        (λ (n)
-          (list-ref l n))
-        (λ (x)
-          (length (take-while l (λ (y)
-                                  (not (eq? x y))))))))
+  (if (empty? l)
+      empty/enum
+      (Enum (length l)
+	    (λ (n)
+	       (list-ref l n))
+	    (λ (x)
+	       (length (take-while l (λ (y)
+					(not (eq? x y)))))))))
 
 ;; take-while : Listof a, (a -> bool) -> Listof a
 (define (take-while l pred)
@@ -109,32 +139,35 @@
 
 ;; sum :: Enum a, Enum b -> Enum (a or b)
 (define (sum/enum e1 e2)
-  (cond [(not (infinite? (Enum-size e1)))
-         (Enum (+ (Enum-size e1)
-                  (Enum-size e2))
-               (λ (n)
-                 (if (< n (Enum-size e1))
-                     ((Enum-from e1) n)
-                     ((Enum-from e2) (- n (Enum-size e1)))))
-               (λ (x)
-                 (with-handlers ([exn:fail? (λ (_)
-                                              (+ (Enum-size e1)
-                                                 ((Enum-to e2) x)))])
-                   ((Enum-to e1) x))))]
-        [(not (infinite? (Enum-size e2)))
-         (sum/enum e2 e1)]
-        [else ;; both infinite, interleave them
-         (Enum +inf.f
-               (λ (n)
-                 (if (even? n)
-                     ((Enum-from e1) (/ n 2))
-                     ((Enum-from e2) (/ (- n 1) 2))))
-               (λ (x)
-                 (with-handlers ([exn:fail? 
-                                  (λ (_)
-                                    (+  (* ((Enum-to e2) x) 2)
-                                        1))])
-                   (* ((Enum-to e1) x) 2))))]))
+  (cond
+   [(= 0 (size e1)) e2]
+   [(= 0 (size e2)) e1]
+   [(not (infinite? (Enum-size e1)))
+    (Enum (+ (Enum-size e1)
+	     (Enum-size e2))
+	  (λ (n)
+	     (if (< n (Enum-size e1))
+		 ((Enum-from e1) n)
+		 ((Enum-from e2) (- n (Enum-size e1)))))
+	  (λ (x)
+	     (with-handlers ([exn:fail? (λ (_)
+					   (+ (Enum-size e1)
+					      ((Enum-to e2) x)))])
+	       ((Enum-to e1) x))))]
+   [(not (infinite? (Enum-size e2)))
+    (sum/enum e2 e1)]
+   [else ;; both infinite, interleave them
+    (Enum +inf.f
+	  (λ (n)
+	     (if (even? n)
+		 ((Enum-from e1) (/ n 2))
+		 ((Enum-from e2) (/ (- n 1) 2))))
+	  (λ (x)
+	     (with-handlers ([exn:fail? 
+			      (λ (_)
+				 (+  (* ((Enum-to e2) x) 2)
+				     1))])
+	       (* ((Enum-to e1) x) 2))))]))
 
 (define odds
   (Enum +inf.f
@@ -178,7 +211,9 @@
 
 ;; prod/enum : Enum a, Enum b -> Enum (a,b)
 (define (prod/enum e1 e2)
-  (cond [(not (infinite? (Enum-size e1)))
+  (cond [(or (= 0 (size e1))
+	     (= 0 (size e2))) empty/enum]
+	[(not (infinite? (Enum-size e1)))
 	 (cond [(not (infinite? (Enum-size e2)))
 		(let [(size (* (Enum-size e1)
 			       (Enum-size e2)))]
@@ -188,7 +223,7 @@
 			       (error "out of range")
 			       (call-with-values
 				   (λ ()
-				      (quotient/remainder n (Enum-size e1)))
+				      (quotient/remainder n (Enum-size e2)))
 				 (λ (q r)
 				    (cons ((Enum-from e1) q)
 					  ((Enum-from e2) r))))))
@@ -264,10 +299,10 @@
               1))
        2)))
 
-
-;; dep/enum : Enum a, (a -> Enum b) -> Enum (a,b)
-(define (dep/enum e f)
-  (cond [(not (infinite? (size (f (decode e 0)))))
+;; dep/enum : Nat or Inf, Enum a, (a -> Enum b) -> Enum (a,b)
+(define (dep/enum s e f)
+  (cond [(= 0 (size e)) empty/enum]
+	[(not (infinite? s))
 	 (Enum (if (infinite? (size e))
 		   +inf.f
 		   (foldl + 0 (map (compose size f) (to-list e))))
@@ -305,7 +340,7 @@
 		  (+ (* (size e) (encode (f (car ab)) (cdr ab)))
 		     (encode e (car ab)))))]
 	[else ;; both infinite, same as prod/enum
-	 (Enum +inf.f
+	 (Enum +inf.f               
 	       (λ (n)
 		  (let* ([k (floor-untri n)]
 			 [t (tri k)]
@@ -324,6 +359,38 @@
 			  2)
 		       l))))]))
 
+;; more utility enums
+;; nats of course
+(define (range/enum low high)
+  (cond [(> low high) (error 'bad-range)]
+	[(infinite? high)
+	 (if (infinite? low)
+	     ints
+	     (map/enum
+	      (λ (n)
+		 (+ n low))
+	      (λ (n)
+		 (- n low))
+	      nats))]
+	[(infinite? low)
+	 (map/enum
+	  (λ (n)
+	     (- high n))
+	  (λ (n)
+	     (+ high n))
+	  nats)]
+	[else
+	 (map/enum (λ (n) (+ n low))
+		   (λ (n) (- n low))
+		   (take/enum nats (+ 1 (- high low))))]))
+
+;; rec/enum : Nat or +-Inf, ( -> Enum a) -> Enum a
+(define (thunk/enum s thunk)
+  (Enum s
+	(λ (n)
+	   (decode (thunk) n))
+	(λ (x)
+	   (encode (thunk) x))))
 
 ;;
 (define confidence 1000)
@@ -339,8 +406,8 @@
 		    (encode e (decode e n)))
 		 nums))))
 
-;; const tests
-(let [(e (const 17))]
+;; const/enum tests
+(let [(e (const/enum 17))]
   (test-begin
    (check-eq? (decode e 0) 17)
    (check-exn exn:fail? 
@@ -367,13 +434,13 @@
    (check-bijection? e)))
 
 ;; map test
-(define (nats+ n)
-  (map/enum nats
-	    (λ (k)
+(define (nats+/enum n)
+  (map/enum (λ (k)
 	       (+ k n))
 	    (λ (k)
-	       (- k n))))
-(define nats+1 (nats+ 1))
+	       (- k n))
+	    nats))
+(define nats+1 (nats+/enum 1))
 
 (test-begin
  (check-equal? (size nats+1) +inf.f)
@@ -443,6 +510,7 @@
 
 ;; prod/enum tests
 (define bool*bool (prod/enum bools bools))
+(define 1*b (prod/enum (const/enum 1) bools))
 (define bool*nats (prod/enum bools nats))
 (define nats*bool (prod/enum nats bools))
 (define nats*nats (prod/enum nats nats))
@@ -454,7 +522,11 @@
 
 ;; prod tests
 (test-begin
- 
+
+ (check-equal? (size 1*b) 2)
+ (check-equal? (decode 1*b 0) (cons 1 #t))
+ (check-equal? (decode 1*b 1) (cons 1 #f))
+ (check-bijection? 1*b)
  (check-equal? (Enum-size bool*bool) 4)
  (check-equal? (decode bool*bool 0)
 	       (cons #t #t))
@@ -512,18 +584,22 @@
   (take/enum nats (+ n 1)))
 
 (define 3-up
-  (dep/enum (list/enum '(0 1 2))
-	    up-to))
+  (dep/enum
+   3
+   (list/enum '(0 1 2))
+   up-to))
 
 (define from-3
-  (dep/enum (list/enum '(0 1 2))
-	    nats+))
+  (dep/enum
+   +inf.f
+   (list/enum '(0 1 2))
+   nats+/enum))
 
 (define nats-to
-  (dep/enum nats up-to))
+  (dep/enum 1 nats up-to))
 
 (define nats-up
-  (dep/enum nats nats+))
+  (dep/enum +inf.f nats nats+/enum))
 
 (test-begin
  (check-equal? (size 3-up) 6)
