@@ -14,6 +14,12 @@
 (struct RTree (val left)
 	#:prefab)
 
+(define (val t)
+  (cond [(Leaf? t)
+	 (Leaf-val t)]
+	[(Tree? t)
+	 (Tree-val t)]))
+
 ;; Enum a -> Enum (listof a)
 (define (listof/enum e)
   (thunk/enum +inf.f
@@ -111,6 +117,45 @@
  (check-tree-eq? (decode five 1) (Tree 1 '() (Tree 3 (Leaf 2) '())))
  (check-tree-eq? (decode five 2) (Tree 2 (Leaf 1) (Leaf 3)))
  (check-tree-eq? (decode five 3) (Tree 3 (Tree 1 '() (Leaf 2)) '()))
- (check-tree-eq? (decode five 4) (Tree 3 (Tree 2 (Leaf 1) '()) '())))
+ (check-tree-eq? (decode five 4) (Tree 3 (Tree 2 (Leaf 1) '()) '())) )
 
-;(define all (bst/enum -inf.f +inf.f))
+(define (tree-to-dot t)
+  (cond [(Leaf? t) (leaf (Leaf-val t))]
+	[(Tree? t) (string-append (maybe-edge (Tree-val t)
+					      (Tree-left t))
+				  (maybe-edge (Tree-val t)
+					      (Tree-right t)))]))
+(define (maybe-edge n m)
+  (if (null? m)
+      ""
+      (string-append
+	(edge n (val m))
+	(tree-to-dot m))))
+(define (leaf n)
+  (string-append "\t" (number->string n) ";\n"))
+
+(define (edge n m)
+  (string-append "\t" (number->string n) " -- " (number->string m) ";\n"))
+
+(define (dot-graph name t)
+  (string-append "graph " name " {\n"
+                 (tree-to-dot t)
+                 "}\n"))
+
+(define (tree-dot enum count)
+  (for ([i (range count)])
+    (let ([fname (prefix-zeros i count)])
+      (display-to-file
+       (dot-graph (number->string i) (decode enum i))
+       (string-append fname ".dot")       
+       #:exists 'replace))))
+
+(define (prefix-zeros i max)
+  (let ([max-length (string-length (number->string max))]
+	[is (number->string i)])
+    (string-append
+     "trees/"
+     (if (< (string-length is) max-length)
+	 (string-append (make-string (- max-length (string-length is)) #\0)
+			is)
+	 is))))
