@@ -96,7 +96,7 @@
               0
               (error 'bad-val)))))
 
-;; list/enum :: Lisof a -> Gen a
+;; list/enum :: Listof a -> Gen a
 ;; input list should not contain duplicates
 (define (list/enum l)
   (if (empty? l)

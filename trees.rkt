@@ -2,7 +2,6 @@
 (require rackunit)
 (require racket/pretty)
 (require "enum.rkt")
-(require profile)
 (require math/number-theory)
 
 (struct Leaf (val)
