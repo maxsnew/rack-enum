@@ -8,10 +8,6 @@
 	#:prefab)
 (struct Tree (val left right)
 	#:prefab)
-(struct LTree (val right)
-	#:prefab)
-(struct RTree (val left)
-	#:prefab)
 
 (define (val t)
   (cond [(Leaf? t)

@@ -82,3 +82,7 @@
     (display (decode exprs i))
     (newline)
     (newline)))
+
+(define (make-exprs n)
+  (for ([i (range n)])
+    (decode exprs i)))
