@@ -12,9 +12,11 @@
 	 prod/enum
 	 dep/enum
 	 map/enum
+	 filter/enum ;; very bad, only use for small enums
 	 
 	 to-list
 	 take/enum
+	 drop/enum
 	 foldl-enum
 
 	 nats
@@ -49,6 +51,22 @@
 	(compose f (Enum-from e))
 	(compose (Enum-to e) inv-f)))
 
+;; filter/enum : Enum a, (a -> bool) -> Enum a
+;; size won't be accurate!
+;; encode is not accurate right now!
+(define (filter/enum e p)
+  (Enum (size e)
+	(λ (n)
+	   (let loop ([i 0]
+		      [seen 0])
+	     (let ([a (decode e i)])
+	       (if (p a)
+		   (if (= seen n)
+		       a
+		       (loop (+ i 1) (+ seen 1)))
+		   (loop (+ i 1) seen)))))
+	(λ (x) (encode e x))))
+
 ;; to-list : Enum a -> listof a
 ;; better be finite
 (define (to-list e)
@@ -74,6 +92,17 @@
 	     (unless (< k n)
 	       (error 'out-of-range))
 	     k))))
+
+;; drop/enum : Enum a, Nat -> Enum a
+(define (drop/enum e n)
+  (unless (or (infinite? (size e))
+	      (<= n (size e)))
+    (error 'too-big))
+  (Enum (- (size e) n)
+	(λ (m)
+	   (decode e (+ n m)))
+	(λ (x)
+	   (- (encode e x) n))))
 
 ;; foldl-enum : Enum a, b, (a,b -> b) -> b
 ;; better be a finite enum
