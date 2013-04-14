@@ -18,6 +18,7 @@
 	 take/enum
 	 drop/enum
 	 foldl-enum
+	 display-enum
 
 	 nats
 	 range/enum
@@ -108,6 +109,12 @@
 ;; better be a finite enum
 (define (foldl-enum f id e)
   (foldl f id (to-list e)))
+
+;; display-enum : Enum a, Nat -> void
+(define (display-enum e n)
+  (for ([i (range n)])
+    (display (decode e i))
+    (newline) (newline)))
 
 (define empty/enum
   (Enum 0
