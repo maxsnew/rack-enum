@@ -174,36 +174,40 @@
               (* 2 (abs n))))))
 
 ;; sum :: Enum a, Enum b -> Enum (a or b)
-(define (sum/enum e1 e2)
-  (cond
-   [(= 0 (size e1)) e2]
-   [(= 0 (size e2)) e1]
-   [(not (infinite? (Enum-size e1)))
-    (Enum (+ (Enum-size e1)
-	     (Enum-size e2))
-	  (λ (n)
-	     (if (< n (Enum-size e1))
-		 ((Enum-from e1) n)
-		 ((Enum-from e2) (- n (Enum-size e1)))))
-	  (λ (x)
-	     (with-handlers ([exn:fail? (λ (_)
-					   (+ (Enum-size e1)
-					      ((Enum-to e2) x)))])
-	       ((Enum-to e1) x))))]
-   [(not (infinite? (Enum-size e2)))
-    (sum/enum e2 e1)]
-   [else ;; both infinite, interleave them
-    (Enum +inf.f
-	  (λ (n)
-	     (if (even? n)
-		 ((Enum-from e1) (/ n 2))
-		 ((Enum-from e2) (/ (- n 1) 2))))
-	  (λ (x)
-	     (with-handlers ([exn:fail? 
-			      (λ (_)
-				 (+  (* ((Enum-to e2) x) 2)
-				     1))])
-	       (* ((Enum-to e1) x) 2))))]))
+(define sum/enum
+  (case-lambda
+    [(e1 e2)
+     (cond
+      [(= 0 (size e1)) e2]
+      [(= 0 (size e2)) e1]
+      [(not (infinite? (Enum-size e1)))
+       (Enum (+ (Enum-size e1)
+		(Enum-size e2))
+	     (λ (n)
+		(if (< n (Enum-size e1))
+		    ((Enum-from e1) n)
+		    ((Enum-from e2) (- n (Enum-size e1)))))
+	     (λ (x)
+		(with-handlers ([exn:fail? (λ (_)
+					      (+ (Enum-size e1)
+						 ((Enum-to e2) x)))])
+		  ((Enum-to e1) x))))]
+      [(not (infinite? (Enum-size e2)))
+       (sum/enum e2 e1)]
+      [else ;; both infinite, interleave them
+       (Enum +inf.f
+	     (λ (n)
+		(if (even? n)
+		    ((Enum-from e1) (/ n 2))
+		    ((Enum-from e2) (/ (- n 1) 2))))
+	     (λ (x)
+		(with-handlers ([exn:fail? 
+				 (λ (_)
+				    (+  (* ((Enum-to e2) x) 2)
+					1))])
+		  (* ((Enum-to e1) x) 2))))])]
+    [(a b c . rest)
+     (sum/enum a (apply sum/enum b c rest))]))
 
 (define odds
   (Enum +inf.f
