@@ -13,6 +13,8 @@
 	 dep/enum
 	 map/enum
 	 filter/enum ;; very bad, only use for small enums
+	 thunk/enum
+	 listof/enum
 	 
 	 to-list
 	 take/enum
@@ -22,7 +24,6 @@
 
 	 nats
 	 range/enum
-	 thunk/enum
 	 nats+/enum)
 
 ;; an Enum a is a struct of < Nat or +Inf, Nat -> a, a -> Nat >
@@ -51,6 +52,9 @@
   (Enum (size e)
 	(compose f (Enum-from e))
 	(compose (Enum-to e) inv-f)))
+
+
+
 
 ;; filter/enum : Enum a, (a -> bool) -> Enum a
 ;; size won't be accurate!
@@ -424,13 +428,24 @@
 		   (λ (n) (- n low))
 		   (take/enum nats (+ 1 (- high low))))]))
 
-;; rec/enum : Nat or +-Inf, ( -> Enum a) -> Enum a
+;; thunk/enum : Nat or +-Inf, ( -> Enum a) -> Enum a
 (define (thunk/enum s thunk)
   (Enum s
 	(λ (n)
 	   (decode (thunk) n))
 	(λ (x)
 	   (encode (thunk) x))))
+
+;; listof/enum : Enum a -> Enum (listof a)
+(define (listof/enum e)
+  (thunk/enum
+   (if (= 0 (size e))
+       0
+       +inf.f)
+   (λ ()
+      (sum/enum
+       (const/enum '())
+       (prod/enum e (listof/enum e))))))
 
 ;;
 (define confidence 1000)
