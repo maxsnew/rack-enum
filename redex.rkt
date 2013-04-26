@@ -66,32 +66,31 @@
      [(? (compose not pair?))
       named-pats])))
 
-;; 
-(define (enum-names named-pats pat)
-  (if (null? named-pats)
-      (pat/enum pat)
-      (dep/enum +inf.f ;; change later!!!
-		(prod/enum
-		 (const/enum (caar named-pats))
-		 (pat/enum (cdar named-pats)))
-		(λ (_)
-		   (enum-names (cdr named-pats) pat)))))
+;; (assoclist name pattern), (hash symbol pattern), pattern -> enum term
+(define (enum-names named-pats nt-pats pat)
+  (let rec ([named-pats named-pats]
+	    [env (hash)])
+    (cond [(null? named-pats) (pat/enum pat nt-pats env)]
+	  [else
+	   (dep/enum +inf.f ;; suspect
+		     (pat/enum (cdar named-pats) nt-pats env)
+		     (λ (term)
+			(rec (cdr named-pats)
+			     (hash-set env
+				       (caar named-pats)
+				       term))))])))
 
 ;; 2 passes, first identify the names
 ;; then make the enumerators dependent on the names
-#;
-(define (pat/enum pat nt-pats)
-  (let loop ([pat pat]
-	     [env (hash)] ;; name -o> any
-	     )
+;; pattern, (hash symbol pattern), (hash symbol term) -> enum term
+(define (pat/enum pat nt-pats named-terms)
+  (let loop ([pat pat])
     (match-a-pattern
      pat
      [`any ;;
-      (values
-       (sum/enum
-	any/enum
-	(listof/enum any/enum))
-       env)]
+      (sum/enum
+       any/enum
+       (listof/enum any/enum))]
      [`number num/enum]
      [`string string/enum]
      [`natural natural/enum]
@@ -99,30 +98,43 @@
      [`real real/enum]
      [`boolean bool/enum]
      [`variable var/enum]
-     
-     [`(variable-except ,s ...) (void)]
-     [`(variable-prefix ,s) (void)]
-     
-     [`variable-not-otherwise-mentioned (error 'no-enum)] ;; error
+     [`(variable-except ,s ...)
+      ;; todo
+      (void)]
+     [`(variable-prefix ,s)
+      ;; todo
+      (void)]
+     [`variable-not-otherwise-mentioned
+      (error 'no-enum)] ;; error
      [`hole
       (const/enum 'hole)]
-     
-     [`(nt ,id) (void)]
+     [`(nt ,id)
+      (loop (hash-ref nt-pats id))]
      [`(name ,name ,pat)
-      ;; not this
-      (void)]
+      (const/enum (hash-ref named-terms name))]
      [`(mismatch-name ,name ,pat)
-      ;; 
-      (loop pat env)
-      ]
+      ;; enum-except!!!
+      (loop pat)]
      [`(in-hole ,p1 ,p2)
-      (void)]
-     [`(hide-hole ,p) (loop p)]
+      (map/enum
+       (λ (t1-t2)
+	  (decomposition (car t1-t2)
+			 (cdr t1-t2)))
+       (λ (decomp)
+	  (cons (decomposition-ctx decomp)
+		(decomposition-term decomp)))
+       (prod/enum
+	(loop p1)
+	(loop p2)))]
+     [`(hide-hole ,p)
+      ;; todo
+      (loop p)]
      [`(side-condition ,p ,g ,e) ;; error
       (error 'no-enum)]
      [`(cross ,s)
       (error 'no-enum)] ;; error
      [`(list ,sub-pats ...)
+      ;; enum-list
       (for ([sub-pat (in-list sub-pats)])
 	(match sub-pat
 	  [`(repeat ,pat ,name ,mismatch)
