@@ -6,8 +6,80 @@
 (struct decomposition (ctx term))
 (define uniq (gensym 'redex-pat/enum))
 
+
+;; sep-names : pattern (hash symbol pattern) -> listof symbol
+;; identify all names and return them in a list where the earlier
+;; names must be enum'd first
+(define (sep-names pat nt-pats)
+  (let loop ([pat pat]
+	     [named-pats '()])
+    (match-a-pattern
+     pat
+     [`any named-pats]
+     [`number named-pats]
+     [`string named-pats]
+     [`natural named-pats]
+     [`integer named-pats]
+     [`real named-pats]
+     [`boolean named-pats]
+     [`variable named-pats]
+     [`(variable-except ,s ...) named-pats]
+     [`(variable-prefix ,s) named-pats]
+     [`variable-not-otherwise-mentioned named-pats]
+     [`hole named-pats]
+     ;; should be whatever names are in that nt
+     [`(nt ,id)
+      (loop (hash-ref nt-pats id) named-pats)]
+     [`(name ,name ,pat)
+      (cond [(assoc name named-pats)
+	     (loop pat named-pats)]
+	    [else
+	     (loop pat
+		   (cons (cons name pat)
+			 named-pats))])]
+     [`(mismatch-name ,name ,pat)
+      (cond [(assoc name named-pats)
+	     (loop pat named-pats)]
+	    [else
+	     (loop pat
+		   (cons (cons name pat)
+			 named-pats))])]
+     [`(in-hole ,p1 ,p2)
+      (loop p2
+	    (loop p1 named-pats))]
+     [`(hide-hole ,p) (loop p named-pats)]
+     [`(side-condition ,p ,g ,e) ;; error
+      (error 'no-enum)]
+     [`(cross ,s)
+      (error 'no-enum)] ;; error
+     [`(list ,sub-pats ...)
+      ;; fold!
+      (foldl (λ (sub-pat named-pats)
+		(loop
+		 (match sub-pat
+		   [`(repeat ,pat ,name ,mismatch)
+		    pat]
+		   [else sub-pat])
+		 named-pats))
+	     named-pats
+	     sub-pats)]
+     [(? (compose not pair?))
+      named-pats])))
+
+;; 
+(define (enum-names named-pats pat)
+  (if (null? named-pats)
+      (pat/enum pat)
+      (dep/enum +inf.f ;; change later!!!
+		(prod/enum
+		 (const/enum (caar named-pats))
+		 (pat/enum (cdar named-pats)))
+		(λ (_)
+		   (enum-names (cdr named-pats) pat)))))
+
 ;; 2 passes, first identify the names
 ;; then make the enumerators dependent on the names
+#;
 (define (pat/enum pat nt-pats)
   (let loop ([pat pat]
 	     [env (hash)] ;; name -o> any
@@ -38,39 +110,13 @@
      [`(nt ,id) (void)]
      [`(name ,name ,pat)
       ;; not this
-      (let/ec k
-	(values
-	 (const/enum
-	  (hash-ref env
-		    name
-		    (λ ()
-		       (let-values ([(p/enum env) (loop pat env)])
-			 (k p/enum (env))))))
-	 env))
-      (cond
-       [(equal? x uniq)
-	]
-       )]
+      (void)]
      [`(mismatch-name ,name ,pat)
       ;; 
       (loop pat env)
       ]
      [`(in-hole ,p1 ,p2)
-      (let*-values ([(p1/enum env) (loop p1 env)]
-		    [(p2/enum env) (loop p2 env)]))
-      (values
-       (map/enum
-	(λ (ctx-term)
-	   (decomposition (car ctx-term)
-			  (cdr ctx-term)))
-	;; plug-hole
-	(λ (x)
-	   (cons (decomposition-ctx x)
-		 (decomposition-term x))) ;;unplug-hole ;; impossible?
-	(prod/enum
-	 p1/enum
-	 p2/enum))
-       env)]
+      (void)]
      [`(hide-hole ,p) (loop p)]
      [`(side-condition ,p ,g ,e) ;; error
       (error 'no-enum)]
@@ -116,8 +162,3 @@
 	    bool/enum
 	    var/enum))
 
-
-(define plug-hole (p1-p2)
-  (let ([plug (cdr p2-p2)]
-	[hollow (car p1-p2)])
-    ))
