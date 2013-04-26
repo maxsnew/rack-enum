@@ -114,7 +114,9 @@
       (const/enum (hash-ref named-terms name))]
      [`(mismatch-name ,name ,pat)
       ;; enum-except!!!
-      (loop pat)]
+      (except/enum
+       (loop pat)
+       (hash-ref named-terms name))]
      [`(in-hole ,p1 ,p2)
       (map/enum
        (λ (t1-t2)
@@ -128,7 +130,7 @@
 	(loop p2)))]
      [`(hide-hole ,p)
       ;; todo
-      (loop p)]
+      (error 'unimpl)]
      [`(side-condition ,p ,g ,e) ;; error
       (error 'no-enum)]
      [`(cross ,s)

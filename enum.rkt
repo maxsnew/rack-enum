@@ -13,6 +13,7 @@
 	 dep/enum
 	 map/enum
 	 filter/enum ;; very bad, only use for small enums
+	 except/enum 
 	 thunk/enum
 	 listof/enum
 	 
@@ -71,6 +72,22 @@
 		       (loop (+ i 1) (+ seen 1)))
 		   (loop (+ i 1) seen)))))
 	(λ (x) (encode e x))))
+
+;; except/enum : Enum a, a -> Enum a
+(define (except/enum e a)
+  (unless (> (size e) 0)
+    (error 'empty-enum))
+  (let ([m (encode e a)])
+    (Enum (- (size e) 1)
+	  (λ (n)
+	     (if (< n m)
+		 (decode e n)
+		 (decode e (+ n 1))))
+	  (λ (x)
+	     (let ([n (encode e x)])
+	       (cond [(< n m) n]
+		     [(> n m) (- n 1)]
+		     [else (error 'excepted)]))))))
 
 ;; to-list : Enum a -> listof a
 ;; better be finite
