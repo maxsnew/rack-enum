@@ -10,6 +10,9 @@
 ;; sep-names : pattern (hash symbol pattern) -> listof symbol
 ;; identify all names and return them in a list where the earlier
 ;; names must be enum'd first
+
+;; Precedence: mismatch repeat -> repeat names -> mismatch names ->
+;; names -> subnames
 (define (sep-names pat nt-pats)
   (let loop ([pat pat]
 	     [named-pats '()])
@@ -30,6 +33,7 @@
      ;; should be whatever names are in that nt
      [`(nt ,id)
       (loop (hash-ref nt-pats id) named-pats)]
+     ;; Important!!
      [`(name ,name ,pat)
       (cond [(assoc name named-pats)
 	     (loop pat named-pats)]
@@ -37,6 +41,7 @@
 	     (loop pat
 		   (cons (cons name pat)
 			 named-pats))])]
+     ;; 
      [`(mismatch-name ,name ,pat)
       (cond [(assoc name named-pats)
 	     (loop pat named-pats)]
@@ -55,12 +60,15 @@
      [`(list ,sub-pats ...)
       ;; fold!
       (foldl (λ (sub-pat named-pats)
-		(loop
-		 (match sub-pat
-		   [`(repeat ,pat ,name ,mismatch)
-		    pat]
-		   [else sub-pat])
-		 named-pats))
+		(match sub-pat
+		  [`(repeat ,pat ,name #f)
+		   (loop pat (cons `(,name (repeat ,pat))
+				   named-pats))
+		   pat]
+		  [`(repeat ,pat #f ,mismatch)
+		   (loop pat (cons `(,mismatch (mismatch-repeat ,pat))
+				   named-pats))]
+		  [else (loop sub-pat named-pats)]))
 	     named-pats
 	     sub-pats)]
      [(? (compose not pair?))
