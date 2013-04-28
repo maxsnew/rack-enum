@@ -33,22 +33,14 @@
      ;; should be whatever names are in that nt
      [`(nt ,id)
       (loop (hash-ref nt-pats id) named-pats)]
-     ;; Important!!
+     ;; 
      [`(name ,name ,pat)
-      (cond [(assoc name named-pats)
-	     (loop pat named-pats)]
-	    [else
-	     (loop pat
-		   (cons (cons name pat)
-			 named-pats))])]
+      (loop pat
+	    (add-if-new name pat named-pats))]
      ;; 
      [`(mismatch-name ,name ,pat)
-      (cond [(assoc name named-pats)
-	     (loop pat named-pats)]
-	    [else
-	     (loop pat
-		   (cons (cons name pat)
-			 named-pats))])]
+      (loop pat
+	    (add-if-new name pat named-pats))]
      [`(in-hole ,p1 ,p2)
       (loop p2
 	    (loop p1 named-pats))]
@@ -58,21 +50,29 @@
      [`(cross ,s)
       (error 'no-enum)] ;; error
      [`(list ,sub-pats ...)
-      ;; fold!
       (foldl (λ (sub-pat named-pats)
 		(match sub-pat
+		  ;; unnamed repeat
+		  [`(repeat ,pat #f #f)
+		   (loop pat named-pats)]
+		  ;; named repeat 
 		  [`(repeat ,pat ,name #f)
-		   (loop pat (cons `(,name (repeat ,pat))
-				   named-pats))
-		   pat]
+		   (loop pat
+			 (add-if-new name 'name-r named-pats))]
+		  ;; mismatch named repeat
 		  [`(repeat ,pat #f ,mismatch)
-		   (loop pat (cons `(,mismatch (mismatch-repeat ,pat))
-				   named-pats))]
+		   (loop pat
+			 (add-if-new mismatch 'mismatch-r named-pats))]
+		  ;; normal subpattern
 		  [else (loop sub-pat named-pats)]))
 	     named-pats
 	     sub-pats)]
      [(? (compose not pair?))
       named-pats])))
+
+(define (add-if-new k v l)
+  (cond [(assoc k l) l]
+	[else (cons `(,k ,v) l)]))
 
 ;; (assoclist name pattern), (hash symbol pattern), pattern -> enum term
 (define (enum-names named-pats nt-pats pat)
@@ -80,13 +80,24 @@
 	    [env (hash)])
     (cond [(null? named-pats) (pat/enum pat nt-pats env)]
 	  [else
-	   (dep/enum +inf.f ;; suspect
-		     (pat/enum (cdar named-pats) nt-pats env)
-		     (λ (term)
-			(rec (cdr named-pats)
-			     (hash-set env
-				       (caar named-pats)
-				       term))))])))
+	   (match
+	     (car named-pats)
+	     ;; named repeat
+	     [`(,name name-r)
+	      (error 'unimpl)]
+	     ;; mismatch repeat
+	     [`(,name mismatch-r)
+	      (error 'unimpl)]
+	     ;; named/mismatch
+	     [`(,name ,pat)
+	      (dep/enum +inf.f ;; suspect
+			(pat/enum pat nt-pats env)
+			(λ (term)
+			   (rec (cdr named-pats)
+				(hash-set env
+					  name
+					  term))))]
+	     [else (error 'bad-assoc)])])))
 
 ;; 2 passes, first identify the names
 ;; then make the enumerators dependent on the names
@@ -145,6 +156,15 @@
       (error 'no-enum)] ;; error
      [`(list ,sub-pats ...)
       ;; enum-list
+      (map
+       (λ (sub-pat)
+	  (match sub-pat
+	    [`(repeat ,pat #f #f)
+	     ]
+	    [`(repeat ,pat ,name #f)]
+	    [`(repeat ,pat #f ,mismatch)]
+	    [else ]))
+	   )
       (for ([sub-pat (in-list sub-pats)])
 	(match sub-pat
 	  [`(repeat ,pat ,name ,mismatch)

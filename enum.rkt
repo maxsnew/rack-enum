@@ -197,6 +197,7 @@
 ;; sum :: Enum a, Enum b -> Enum (a or b)
 (define sum/enum
   (case-lambda
+    [(e) e]
     [(e1 e2)
      (cond
       [(= 0 (size e1)) e2]
@@ -271,78 +272,84 @@
 	))
 
 ;; prod/enum : Enum a, Enum b -> Enum (a,b)
-(define (prod/enum e1 e2)
-  (cond [(or (= 0 (size e1))
-	     (= 0 (size e2))) empty/enum]
-	[(not (infinite? (Enum-size e1)))
-	 (cond [(not (infinite? (Enum-size e2)))
-		(let [(size (* (Enum-size e1)
-			       (Enum-size e2)))]
-		  (Enum size
-			(λ (n) ;; bijection from n -> axb
-			   (if (> n size)
-			       (error "out of range")
-			       (call-with-values
-				   (λ ()
-				      (quotient/remainder n (Enum-size e2)))
-				 (λ (q r)
-				    (cons ((Enum-from e1) q)
-					  ((Enum-from e2) r))))))
-			(λ (xs)
-			   (unless (pair? xs)
-			     (error "not a pair"))
-			   (+ (* (Enum-size e1)
-				 ((Enum-to e1) (car xs)))
-			      ((Enum-to e2) (cdr xs))))))]
-	       [else
-		(Enum +inf.f
-		      (λ (n)
-			 (call-with-values
-			     (λ ()
-				(quotient/remainder n (Enum-size e1)))
-			   (λ (q r)
-			      (cons ((Enum-from e1) r)
-				    ((Enum-from e2) q)))))
-		      (λ (xs)
-			 (unless (pair? xs)
-			   (error "not a pair"))
-			 (+ ((Enum-to e1) (car xs))
-			    (* (Enum-size e1)
-			       ((Enum-to e2) (cdr xs))))))])]
-	[(not (infinite? (Enum-size e2)))
-	 (Enum +inf.f
-	       (λ (n)
-		  (call-with-values
-		      (λ ()
-			 (quotient/remainder n (Enum-size e2)))
-		    (λ (q r)
-		       (cons ((Enum-from e1) q)
-			     ((Enum-from e2) r)))))
-	       (λ (xs)
-		  (unless (pair? xs)
-		    (error "not a pair"))
-		  (+ (* (Enum-size e2)
-			((Enum-to e1) (car xs)))
-		     ((Enum-to e2) (cdr xs)))))]
-	[else
-	 (Enum (* (Enum-size e1)
-		  (Enum-size e2))
-	       (λ (n)
-		  (let* ([k (floor-untri n)]
-			 [t (tri k)]
-			 [l (- n t)]
-			 [m (- k l)])
-		    (cons ((Enum-from e1) l)
-			  ((Enum-from e2) m))))
-	       (λ (xs) ;; bijection from nxn -> n, inverse of previous
-		  ;; (n,m) -> (n+m)(n+m+1)/2 + n
-		  (unless (pair? xs)
-		    (error "not a pair"))
-		  (let ([l ((Enum-to e1) (car xs))]
-			[m ((Enum-to e2) (cdr xs))])
-		    (+ (/ (* (+ l m) (+ l m 1))
-			  2)
-		       l))))]))
+(define prod/enum
+  (case-lambda
+    [(e) e]
+    [(e1 e2)
+     (cond [(or (= 0 (size e1))
+		(= 0 (size e2))) empty/enum]
+	   [(not (infinite? (Enum-size e1)))
+	    (cond [(not (infinite? (Enum-size e2)))
+		   (let [(size (* (Enum-size e1)
+				  (Enum-size e2)))]
+		     (Enum size
+			   (λ (n) ;; bijection from n -> axb
+			      (if (> n size)
+				  (error "out of range")
+				  (call-with-values
+				      (λ ()
+					 (quotient/remainder n (Enum-size e2)))
+				    (λ (q r)
+				       (cons ((Enum-from e1) q)
+					     ((Enum-from e2) r))))))
+			   (λ (xs)
+			      (unless (pair? xs)
+				(error "not a pair"))
+			      (+ (* (Enum-size e1)
+				    ((Enum-to e1) (car xs)))
+				 ((Enum-to e2) (cdr xs))))))]
+		  [else
+		   (Enum +inf.f
+			 (λ (n)
+			    (call-with-values
+				(λ ()
+				   (quotient/remainder n (Enum-size e1)))
+			      (λ (q r)
+				 (cons ((Enum-from e1) r)
+				       ((Enum-from e2) q)))))
+			 (λ (xs)
+			    (unless (pair? xs)
+			      (error "not a pair"))
+			    (+ ((Enum-to e1) (car xs))
+			       (* (Enum-size e1)
+				  ((Enum-to e2) (cdr xs))))))])]
+	   [(not (infinite? (Enum-size e2)))
+	    (Enum +inf.f
+		  (λ (n)
+		     (call-with-values
+			 (λ ()
+			    (quotient/remainder n (Enum-size e2)))
+		       (λ (q r)
+			  (cons ((Enum-from e1) q)
+				((Enum-from e2) r)))))
+		  (λ (xs)
+		     (unless (pair? xs)
+		       (error "not a pair"))
+		     (+ (* (Enum-size e2)
+			   ((Enum-to e1) (car xs)))
+			((Enum-to e2) (cdr xs)))))]
+	   [else
+	    (Enum (* (Enum-size e1)
+		     (Enum-size e2))
+		  (λ (n)
+		     (let* ([k (floor-untri n)]
+			    [t (tri k)]
+			    [l (- n t)]
+			    [m (- k l)])
+		       (cons ((Enum-from e1) l)
+			     ((Enum-from e2) m))))
+		  (λ (xs) ;; bijection from nxn -> n, inverse of previous
+		     ;; (n,m) -> (n+m)(n+m+1)/2 + n
+		     (unless (pair? xs)
+		       (error "not a pair"))
+		     (let ([l ((Enum-to e1) (car xs))]
+			   [m ((Enum-to e2) (cdr xs))])
+		       (+ (/ (* (+ l m) (+ l m 1))
+			     2)
+			  l))))])]
+    [(a b c . rest)
+     (prod/enum a (apply prod/enum b c rest))])
+  )
 
 ;; the nth triangle number
 (define (tri n)
