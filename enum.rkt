@@ -7,7 +7,7 @@
 	 decode
 	 empty/enum
 	 const/enum
-	 list/enum
+	 from-list/enum
 	 sum/enum
 	 prod/enum
 	 dep/enum
@@ -16,6 +16,7 @@
 	 except/enum 
 	 thunk/enum
 	 listof/enum
+	 list/enum
 	 
 	 to-list
 	 take/enum
@@ -153,9 +154,9 @@
               0
               (error 'bad-val)))))
 
-;; list/enum :: Listof a -> Gen a
+;; from-list/enum :: Listof a -> Gen a
 ;; input list should not contain duplicates
-(define (list/enum l)
+(define (from-list/enum l)
   (if (empty? l)
       empty/enum
       (Enum (length l)
@@ -175,7 +176,7 @@
 
 
 (define bools
-  (list/enum (list #t #f)))
+  (from-list/enum (list #t #f)))
 (define nats
   (Enum +inf.f
         identity
@@ -348,8 +349,7 @@
 			     2)
 			  l))))])]
     [(a b c . rest)
-     (prod/enum a (apply prod/enum b c rest))])
-  )
+     (prod/enum a (apply prod/enum b c rest))]))
 
 ;; the nth triangle number
 (define (tri n)
@@ -471,6 +471,10 @@
        (const/enum '())
        (prod/enum e (listof/enum e))))))
 
+;; list/enum : listof (Enum any) -> Enum (listof any)
+(define (list/enum es)
+  (apply prod/enum (append es `(,(const/enum '())))))
+
 ;;
 (define confidence 1000)
 (define nums (build-list confidence identity))
@@ -498,8 +502,8 @@
 		 (encode e 0)))
    (check-bijection? e)))
 
-;; list/enum tests
-(let [(e (list/enum '(5 4 1 8)))]
+;; from-list/enum tests
+(let [(e (from-list/enum '(5 4 1 8)))]
   (test-begin
    (check-eq? (decode e 0) 5)
    (check-eq? (decode e 3) 8)
@@ -545,7 +549,7 @@
 ;; sum tests
 (test-begin
  (let [(bool-or-num (sum/enum bools
-                              (list/enum '(0 1 2))))
+                              (from-list/enum '(0 1 2))))
        (bool-or-nat (sum/enum bools
                               nats))
        (nat-or-bool (sum/enum nats
@@ -665,13 +669,13 @@
 (define 3-up
   (dep/enum
    3
-   (list/enum '(0 1 2))
+   (from-list/enum '(0 1 2))
    up-to))
 
 (define from-3
   (dep/enum
    +inf.f
-   (list/enum '(0 1 2))
+   (from-list/enum '(0 1 2))
    nats+/enum))
 
 (define nats-to

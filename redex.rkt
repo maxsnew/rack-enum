@@ -7,6 +7,12 @@
 (define uniq (gensym 'redex-pat/enum))
 
 
+;; pat/enum : pattern (hash symbol pattern) -> Enum term
+(define (pat/enum pat nt-pats)
+  (enum-names (sep-names pat nt-pats)
+	      nt-pats
+	      pat))
+
 ;; sep-names : pattern (hash symbol pattern) -> listof symbol
 ;; identify all names and return them in a list where the earlier
 ;; names must be enum'd first
@@ -78,20 +84,26 @@
 (define (enum-names named-pats nt-pats pat)
   (let rec ([named-pats named-pats]
 	    [env (hash)])
-    (cond [(null? named-pats) (pat/enum pat nt-pats env)]
+    (cond [(null? named-pats) (pattern/enum pat nt-pats env)]
 	  [else
 	   (match
 	     (car named-pats)
 	     ;; named repeat
 	     [`(,name name-r)
-	      (error 'unimpl)]
+	      (dep/enum +inf.f
+			nats
+			(λ (n)
+			   (rec (cdr named-pats)
+				(hash-set env
+					  name
+					  n))))]
 	     ;; mismatch repeat
 	     [`(,name mismatch-r)
 	      (error 'unimpl)]
 	     ;; named/mismatch
 	     [`(,name ,pat)
 	      (dep/enum +inf.f ;; suspect
-			(pat/enum pat nt-pats env)
+			(pattern/enum pat nt-pats env)
 			(λ (term)
 			   (rec (cdr named-pats)
 				(hash-set env
@@ -102,8 +114,12 @@
 ;; 2 passes, first identify the names
 ;; then make the enumerators dependent on the names
 ;; pattern, (hash symbol pattern), (hash symbol term) -> enum term
-(define (pat/enum pat nt-pats named-terms)
-  (let loop ([pat pat])
+(define (pattern/enum pat nt-pats named-terms)
+  (let loop ([pat pat]
+	     [n 0])
+    (displayln pat)
+    (unless (< n 100)
+      (error 'inf-prob))
     (match-a-pattern
      pat
      [`any ;;
@@ -128,13 +144,16 @@
      [`hole
       (const/enum 'hole)]
      [`(nt ,id)
-      (loop (hash-ref nt-pats id))]
+      (thunk/enum
+       +inf.f
+       (λ ()
+	  (loop (hash-ref nt-pats id) (+ n 1))))]
      [`(name ,name ,pat)
       (const/enum (hash-ref named-terms name))]
      [`(mismatch-name ,name ,pat)
       ;; enum-except!!!
       (except/enum
-       (loop pat)
+       (loop pat (+ n 1))
        (hash-ref named-terms name))]
      [`(in-hole ,p1 ,p2)
       (map/enum
@@ -145,39 +164,42 @@
 	  (cons (decomposition-ctx decomp)
 		(decomposition-term decomp)))
        (prod/enum
-	(loop p1)
-	(loop p2)))]
+	(loop p1 (+ n 1))
+	(loop p2 (+ n 1))))]
      [`(hide-hole ,p)
       ;; todo
-      (error 'unimpl)]
+      (loop p (+ n 1))]
      [`(side-condition ,p ,g ,e) ;; error
       (error 'no-enum)]
      [`(cross ,s)
       (error 'no-enum)] ;; error
      [`(list ,sub-pats ...)
       ;; enum-list
-      (map
-       (λ (sub-pat)
-	  (match sub-pat
-	    [`(repeat ,pat #f #f)
-	     ]
-	    [`(repeat ,pat ,name #f)]
-	    [`(repeat ,pat #f ,mismatch)]
-	    [else ]))
-	   )
-      (for ([sub-pat (in-list sub-pats)])
-	(match sub-pat
-	  [`(repeat ,pat ,name ,mismatch)
-	   (loop pat)]
-	  [else
-	   (loop sub-pat)]))]
+      (list/enum
+       (map
+	(λ (sub-pat)
+	   (match sub-pat
+	     [`(repeat ,pat #f #f)
+	      (dep/enum
+	       nats
+	       (λ (n)
+		  (build-list n (const (loop pat (+ n 1))))))]
+	     [`(repeat ,pat ,name #f)
+	      (build-list (hash-ref named-terms name)
+			  (const (loop pat (+ n 1))))]
+	     [`(repeat ,pat #f ,mismatch)
+	      (error 'unimpl)]
+	     [else (loop sub-pat (+ n 1))]))
+	sub-pats))]
      [(? (compose not pair?)) 
       (const/enum pat)])))
 
+(define (const x)
+  (λ () x))
 (define natural/enum nats)
 
 (define string/enum
-  (list/enum '("" "hello" "world")))
+  (from-list/enum '("" "hello" "world")))
 
 
 (define integer/enum
@@ -186,17 +208,16 @@
 		      (λ (n) (- (- n) 1))
 		      nats)))
 
-(define real/enum (list/enum '(0.0 1.5 123.112354)))
+(define real/enum (from-list/enum '(0.0 1.5 123.112354)))
 (define num/enum
   (sum/enum natural/enum
 	    integer/enum
 	    real/enum))
 
-
 (define bool/enum
-  (list/enum '(#t #f)))
+  (from-list/enum '(#t #f)))
 
-(define var/enum (list/enum '(x y z)))
+(define var/enum (from-list/enum '(x y z)))
 
 (define any/enum
   (sum/enum num/enum

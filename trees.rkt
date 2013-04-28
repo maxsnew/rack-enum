@@ -23,7 +23,7 @@
 		  (const/enum '())
 		  (prod/enum e (listof/enum e))))))
 
-(define bools (list/enum '(#t #f)))
+(define bools (from-list/enum '(#t #f)))
 (define lbs (listof/enum bools))
 
 (define (ranges low high)

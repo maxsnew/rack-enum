@@ -22,7 +22,7 @@
   (map/enum
    expr-to-list
    (λ (x) x)
-   (expr/enum empty/enum (list/enum (map Var vars)))))
+   (expr/enum empty/enum (from-list/enum (map Var vars)))))
 
 (define (expr/enum in-scope/enum vars/enum)
   (thunk/enum

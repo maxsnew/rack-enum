@@ -70,8 +70,8 @@
   ;;(display primitives)
   (sum/enum
    (sum/enum
-    (list/enum (set->list (hash-ref typed-vars type (set))))
-    (list/enum (set->list (hash-ref primitives type (set)))))
+    (from-list/enum (set->list (hash-ref typed-vars type (set))))
+    (from-list/enum (set->list (hash-ref primitives type (set)))))
    (sum/enum
     (lambda/enum type typed-vars primitives base-types/enum var-names/enum)
     (app/enum type typed-vars primitives base-types/enum var-names/enum))))
@@ -220,5 +220,5 @@
 		   (Type 'int) (set 0)
 		   (Arrow (Type 'int) (Type 'int)) (set 'add1)
 		   (Arrow (Type 'bool) (Arrow (Type 'bool) (Type 'bool))) (set 'or 'and))
-	     (list/enum (list (Type 'int) (Type 'bool)))
-	     (list/enum (list (Var 'x) (Var 'y)))))
+	     (from-list/enum (list (Type 'int) (Type 'bool)))
+	     (from-list/enum (list (Var 'x) (Var 'y)))))
