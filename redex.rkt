@@ -118,11 +118,11 @@
 
 ;; 2 passes, first identify the names
 ;; then make the enumerators dependent on the names
-;; pattern, (hash symbol pattern), (hash symbol term) -> enum term
+;; pattern lang (hash symbol term) -> enum term
 (define (pattern/enum pat nt-pats named-terms)
   (let loop ([pat pat]
 	     [n 0])
-    (displayln pat)
+#;    (displayln pat)
     (unless (< n 100)
       (error 'inf-prob))
     (match-a-pattern
@@ -152,7 +152,11 @@
       (thunk/enum
        +inf.f
        (λ ()
-	  (loop (hash-ref nt-pats id) (+ n 1))))]
+	  (apply sum/enum
+		 (map
+		  (λ (rhs)
+		     (loop (rhs-pattern rhs) (+ n 1)))
+		  (lookup nt-pats id)))))]
      [`(name ,name ,pat)
       (const/enum (hash-ref named-terms name))]
      [`(mismatch-name ,name ,pat)
