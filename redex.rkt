@@ -199,15 +199,29 @@
      [(? (compose not pair?)) 
       (const/enum pat)])))
 
-(define (lookup ))
+;; lookup : lang symbol -> (listof rhs)
+(define (lookup nts name)
+  (let rec ([nts nts])
+    (cond [(null? nts) (error 'unkown-nt)]
+	  [(eq? name (nt-name (car nts)))
+	   (nt-rhs (car nts))]
+	  [else (rec (cdr nts))])))
 
 (define (const x)
   (λ () x))
 (define natural/enum nats)
 
-(define string/enum
-  (from-list/enum '("" "hello" "world")))
+(define char/enum
+  (map/enum
+   integer->char
+   char->integer
+   (range/enum 0 #x10FFFF)))
 
+(define string/enum
+  (map/enum
+   list->string
+   string->list
+   (listof/enum char/enum)))
 
 (define integer/enum
   (sum/enum nats
@@ -224,7 +238,11 @@
 (define bool/enum
   (from-list/enum '(#t #f)))
 
-(define var/enum (from-list/enum '(x y z)))
+(define var/enum
+  (map/enum
+   string->symbol
+   symbol->string
+   string/enum))
 
 (define any/enum
   (sum/enum num/enum
