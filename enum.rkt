@@ -1,5 +1,8 @@
-#lang racket
-(require rackunit)
+#lang racket/base
+(require racket/math
+	 racket/list
+	 racket/function
+	 rackunit)
 
 (provide Enum
 	 size
@@ -96,7 +99,8 @@
   (when (infinite? (size e))
     (error 'too-big))
   (map (Enum-from e)
-       (stream->list (in-range (size e)))))
+       (build-list (size e)
+		   identity)))
 
 ;; take/enum : Enum a, Nat -> Enum a
 ;; returns an enum of the first n parts of e
@@ -173,7 +177,6 @@
         [else
          (cons (car l)
             (take-while (cdr l) pred))]))
-
 
 (define bools
   (from-list/enum (list #t #f)))

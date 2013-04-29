@@ -1,8 +1,11 @@
-#lang racket
-(require rackunit)
-(require racket/pretty)
-(require "enum.rkt")
-(require math/number-theory)
+#lang racket/base
+(require racket/pretty
+	 rackunit
+	 racket/math
+	 racket/list
+	 racket/file
+	 math/number-theory
+	 "enum.rkt")
 
 (struct Leaf (val)
 	#:prefab)
@@ -14,14 +17,6 @@
 	 (Leaf-val t)]
 	[(Tree? t)
 	 (Tree-val t)]))
-
-;; Enum a -> Enum (listof a)
-(define (listof/enum e)
-  (thunk/enum +inf.f
-	      (λ ()
-		 (sum/enum
-		  (const/enum '())
-		  (prod/enum e (listof/enum e))))))
 
 (define bools (from-list/enum '(#t #f)))
 (define lbs (listof/enum bools))

@@ -1,5 +1,7 @@
-#lang racket
-(require rackunit)
+#lang racket/base
+(require racket/bool
+	 racket/set
+	 rackunit)
 (require "enum.rkt")
 
 (struct Expr (type expr)

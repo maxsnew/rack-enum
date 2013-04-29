@@ -1,5 +1,6 @@
-#lang racket
-(require rackunit)
+#lang racket/base
+(require rackunit
+	 racket/list)
 (require "enum.rkt")
 
 (struct Lambda (var expr)

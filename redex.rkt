@@ -1,19 +1,24 @@
 #lang racket/base
 (require redex/private/match-a-pattern
+	 redex/private/matcher
 	 "enum.rkt"
 	 racket/match)
 
 (struct decomposition (ctx term))
 (define uniq (gensym 'redex-pat/enum))
 
+;; lang = (listof nt)
+;; nt = (make-nt sym (listof rhs))
+;; rhs = (make-rhs single-pattern)
+;; single-pattern = sexp
 
-;; pat/enum : pattern (hash symbol pattern) -> Enum term
+;; pat/enum : pattern lang -> Enum term
 (define (pat/enum pat nt-pats)
   (enum-names (sep-names pat nt-pats)
 	      nt-pats
 	      pat))
 
-;; sep-names : pattern (hash symbol pattern) -> listof symbol
+;; sep-names : single-pattern lang -> (assoclist symbol pattern)
 ;; identify all names and return them in a list where the earlier
 ;; names must be enum'd first
 
@@ -193,6 +198,8 @@
 	sub-pats))]
      [(? (compose not pair?)) 
       (const/enum pat)])))
+
+(define (lookup ))
 
 (define (const x)
   (λ () x))
