@@ -14,6 +14,7 @@
 	 sum/enum
 	 prod/enum
 	 dep/enum
+	 dep2/enum ;; doesn't require size
 	 map/enum
 	 filter/enum ;; very bad, only use for small enums
 	 except/enum 
@@ -370,8 +371,69 @@
               1))
        2)))
 
-;; dep/enum : Nat or Inf, Enum a, (a -> Enum b) -> Enum (a,b)
-(define (dep/enum s e f)
+
+;; dep/enum : Enum a (a -> Enum b) -> Enum (a,b)
+(define (dep/enum e f)
+  (cond [(= 0 (size e)) empty/enum]
+	[(not (infinite? (size (f (decode e 0)))))
+	 (Enum (if (infinite? (size e))
+		   +inf.f
+		   (foldl + 0 (map (compose size f) (to-list e))))
+	       (λ (n) ;; n -> axb
+		  (let loop ([ei 0]
+			     [seen 0])
+		    (let* ([a (decode e ei)]
+			   [e2 (f a)])
+		      (if (< (- n seen)
+			     (size e2))
+			  (cons a (decode e2 (- n seen)))
+			  (loop (+ ei 1)
+				(+ seen (size e2)))))))
+	       (λ (ab) ;; axb -> n
+		  (let ([ai (encode e (car ab))])
+		    (+ (let loop ([i 0]
+				  [sum 0])
+			 (if (>= i ai)
+			     sum
+			     (loop (+ i 1)
+				   (+ sum
+				      (size (f (decode e i)))))))
+		       (encode (f (car ab))
+			       (cdr ab))))))]
+	[(not (infinite? (size e)))
+	 (Enum +inf.f
+	       (λ (n)
+		  (call-with-values
+		      (λ ()
+			 (quotient/remainder n (size e)))
+		    (λ (q r)
+		       (cons (decode e r)
+			     (decode (f (decode e r)) q)))))
+	       (λ (ab)
+		  (+ (* (size e) (encode (f (car ab)) (cdr ab)))
+		     (encode e (car ab)))))]
+	[else ;; both infinite, same as prod/enum
+	 (Enum +inf.f               
+	       (λ (n)
+		  (let* ([k (floor-untri n)]
+			 [t (tri k)]
+			 [l (- n t)]
+			 [m (- k l)]
+			 [a (decode e l)])
+		    (cons a
+			  (decode (f a) m))))
+	       (λ (xs) ;; bijection from nxn -> n, inverse of previous
+		  ;; (n,m) -> (n+m)(n+m+1)/2 + n
+		  (unless (pair? xs)
+		    (error "not a pair"))
+		  (let ([l (encode e (car xs))]
+			[m (encode (f (car xs)) (cdr xs))])
+		    (+ (/ (* (+ l m) (+ l m 1))
+			  2)
+		       l))))]))
+
+;; dep2 : (Nat or Inf) Enum a (a -> Enum b) -> Enum (a,b)
+(define (dep2/enum s e f)
   (cond [(= 0 (size e)) empty/enum]
 	[(not (infinite? s))
 	 (Enum (if (infinite? (size e))
@@ -429,6 +491,8 @@
 		    (+ (/ (* (+ l m) (+ l m 1))
 			  2)
 		       l))))]))
+
+
 
 ;; more utility enums
 ;; nats of course
@@ -671,21 +735,19 @@
 
 (define 3-up
   (dep/enum
-   3
    (from-list/enum '(0 1 2))
    up-to))
 
 (define from-3
   (dep/enum
-   +inf.f
    (from-list/enum '(0 1 2))
    nats+/enum))
 
 (define nats-to
-  (dep/enum 1 nats up-to))
+  (dep/enum nats up-to))
 
 (define nats-up
-  (dep/enum +inf.f nats nats+/enum))
+  (dep/enum nats nats+/enum))
 
 (test-begin
  (check-equal? (size 3-up) 6)

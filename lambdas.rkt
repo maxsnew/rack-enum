@@ -50,7 +50,6 @@
 	  (cons (Lambda-var l)
 		(Lambda-expr l)))
        (dep/enum
-	+inf.f
 	vars/enum
 	(λ (v)
 	   (expr/enum

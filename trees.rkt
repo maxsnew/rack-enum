@@ -52,7 +52,6 @@
 		  (cons (Tree-left t)
 			(Tree-right t))))
 	 (dep/enum
-	  (- high low 1)
 	  (range/enum (+ low 1) (- high 1))
 	  (λ (n)
 	     (prod/enum
@@ -86,11 +85,11 @@
 (define one (bst/enum 0 2))
 (define two (bst/enum 0 3))
 (define five (bst/enum 0 4))
+
 (define 0-trees
   (map/enum cdr 
             (λ (x) (cons 1 x))
             (dep/enum
-	     (catalan 1)
              (nats+/enum 2)
              (λ (n)
                (bst/enum 0 n)))))

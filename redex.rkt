@@ -98,8 +98,7 @@
 	     (car named-pats)
 	     ;; named repeat
 	     [`(,name name-r)
-	      (dep/enum +inf.f
-			nats
+	      (dep/enum nats
 			(λ (n)
 			   (rec (cdr named-pats)
 				(hash-set env
@@ -110,8 +109,7 @@
 	      (error 'unimpl)]
 	     ;; named/mismatch
 	     [`(,name ,pat)
-	      (dep/enum +inf.f ;; suspect
-			(pattern/enum pat nt-pats env)
+	      (dep/enum (pattern/enum pat nt-pats env)
 			(λ (term)
 			   (rec (cdr named-pats)
 				(hash-set env

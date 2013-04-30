@@ -57,11 +57,6 @@
       (cons (Expr-type expr)
 	    (Expr-expr expr)))
    (dep/enum
-    (if (or (false? (hash-iterate-first primitives))
-	    (= 0 (size base-types/enum))
-	    (= 0 (size var-names/enum)))
-	0
-	+inf.f)
     (type/enum base-types/enum)
     (λ (t) ;; for each type, enumerate all terms of that type
        (typed-term/enum t  (hash) primitives base-types/enum var-names/enum)))))
@@ -97,7 +92,6 @@
 	    +inf.f)
 	(λ ()
 	   (dep/enum
-	    +inf.f
 	    var-names/enum
 	    (λ (v)
 	       (thunk/enum
@@ -145,7 +139,6 @@
 	+inf.f)
     (λ ()
        (dep/enum
-	+inf.f
 	(type/enum base-types/enum)
 	(λ (t)
 	   (prod/enum
