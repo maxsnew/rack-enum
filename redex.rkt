@@ -41,9 +41,8 @@
      [`(variable-prefix ,s) named-pats]
      [`variable-not-otherwise-mentioned named-pats]
      [`hole named-pats]
-     ;; should be whatever names are in that nt
-     [`(nt ,id)
-      (loop (hash-ref nt-pats id) named-pats)]
+     ;; names inside nts are separate
+     [`(nt ,id) named-pats]
      ;; 
      [`(name ,name ,pat)
       (loop pat
@@ -155,7 +154,7 @@
 	  (apply sum/enum
 		 (map
 		  (λ (rhs)
-		     (loop (rhs-pattern rhs) (+ n 1)))
+		     (pat/enum (rhs-pattern rhs) nt-pats))
 		  (lookup nt-pats id)))))]
      [`(name ,name ,pat)
       (const/enum (hash-ref named-terms name))]
