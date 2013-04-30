@@ -4,8 +4,12 @@
 	 "enum.rkt"
 	 racket/match)
 
+(provide decomposition
+	 pat/enum
+	 sep-names
+	 pattern/enum)
+
 (struct decomposition (ctx term))
-(define uniq (gensym 'redex-pat/enum))
 
 ;; lang = (listof nt)
 ;; nt = (make-nt sym (listof rhs))
@@ -149,7 +153,7 @@
       (const/enum 'hole)]
      [`(nt ,id)
       (thunk/enum
-       +inf.f
+       +inf.f ;; definitely wrong!
        (λ ()
 	  (apply sum/enum
 		 (map
@@ -159,7 +163,6 @@
      [`(name ,name ,pat)
       (const/enum (hash-ref named-terms name))]
      [`(mismatch-name ,name ,pat)
-      ;; enum-except!!!
       (except/enum
        (loop pat (+ n 1))
        (hash-ref named-terms name))]
@@ -218,7 +221,7 @@
   (map/enum
    integer->char
    char->integer
-   (range/enum 0 #x10FFFF)))
+   (range/enum #x61 #x7a)))
 
 (define string/enum
   (map/enum
@@ -243,9 +246,9 @@
 
 (define var/enum
   (map/enum
-   string->symbol
-   symbol->string
-   string/enum))
+   (compose string->symbol list->string list)
+   (compose car string->list symbol->string)
+   char/enum))
 
 (define any/enum
   (sum/enum num/enum
