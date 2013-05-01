@@ -30,7 +30,9 @@
 
 	 nats
 	 range/enum
-	 nats+/enum)
+	 nats+/enum
+
+	 check-bijection?)
 
 ;; an Enum a is a struct of < Nat or +Inf, Nat -> a, a -> Nat >
 (struct Enum
