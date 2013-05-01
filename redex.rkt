@@ -109,12 +109,20 @@
 	      (error 'unimpl)]
 	     ;; named/mismatch
 	     [`(,name ,pat)
-	      (dep/enum (pattern/enum pat nt-pats env)
-			(λ (term)
-			   (rec (cdr named-pats)
-				(hash-set env
-					  name
-					  term))))]
+	      (map/enum
+	       (λ (named)
+		  `((named ,name ,(car named)) ,(cdr named)))
+	       (λ (sepd)
+		  (match
+		    sepd
+		    [`((named ,name ,n-term) ,term)
+		     (cons n-term term)]))
+	       (dep/enum (pattern/enum pat nt-pats env)
+			 (λ (term)
+			    (rec (cdr named-pats)
+				 (hash-set env
+					   name
+					   term)))))]
 	     [else (error 'bad-assoc)])])))
 
 ;; 2 passes, first identify the names
