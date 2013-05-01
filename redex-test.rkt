@@ -13,7 +13,6 @@
 ;; rhs = (make-rhs single-pattern)
 ;; single-pattern = sexp
 
-
 ;; find-recs test
 (define-language recL
   (n v)
@@ -27,10 +26,10 @@
 
 (let ([recs (find-recs reclang)])
   (test-begin
-   (check-false (hash-ref recs 'n))
-   (check-false (hash-ref recs 'v))
-   (check-true (hash-ref recs 'e))
-   (check-true (hash-ref recs 'ee))))
+   (check-equal? (hash-ref recs 'n) '(#f))
+   (check-equal? (hash-ref recs 'v) '(#f))
+   (check-equal? (hash-ref recs 'e) '(#t #t #f))
+   (check-equal? (hash-ref recs 'ee) '(#t))))
 
 (define-language L
   (e (e_1 e_1)
@@ -38,9 +37,6 @@
   (n number))
 
 (define lang1 (compiled-lang-lang L))
-
-(test-begin
- )
 
 (define eterms (pat/enum `(nt e) (compiled-lang-lang L)))
 #;(define nterms (pat/enum `(list (name e_1 (nt e)) number (name e_1 (nt e))) (compiled-lang-lang L)))

@@ -19,12 +19,22 @@
 ;; single-pattern = sexp
 
 ;; pat/enum : pattern lang -> Enum term
-(define (pat/enum pat nt-pats)
-  (enum-names (sep-names pat nt-pats)
-	      nt-pats
-	      pat))
+(define pat/enum
+  (case-lambda
+    [(p ntps)
+     (let ([recs (find-recs ntps)])
+       (pat/enum p
+		 (sort-lang ntps recs)
+		 recs))]
+    [(pat nt-pats recs)
+     (enum-names pat
+		 nt-pats
+		 (sep-names pat nt-pats)
+		 recs)]))
 
-;; find-recs : lang -> (hash symbol -o> bool)
+
+
+;; find-recs : lang -> (hash symbol -o> listof bool)
 ;; Identifies which non-terminals are recursive
 (define (find-recs nt-pats)
   (define is-rec?
@@ -76,13 +86,69 @@
 			  sub-pats)]
 		  [(? (compose not pair?)) #f])))
 	    (nt-rhs nt)))]))
+  (define (calls-rec? rhs recs)
+    (let rec ([pat (rhs-pattern rhs)])
+      (match-a-pattern
+       pat
+       [`any #f]
+       [`number #f]
+       [`string #f]
+       [`natural #f]
+       [`integer #f]
+       [`real #f]
+       [`boolean #f]
+       [`variable #f]
+       [`(variable-except ,s ...) #f]
+       [`(variable-prefix ,s) #f]
+       [`variable-not-otherwise-mentioned #f]
+       [`hole #f]
+       [`(nt ,id)
+	(hash-ref recs id)]
+       [`(name ,name ,pat)
+	(rec pat)]
+       [`(mismatch-name ,name ,pat)
+	(rec pat)]
+       [`(in-hole ,p1 ,p2)
+	(or (rec p1)
+	    (rec p2))]
+       [`(hide-hole ,p) (rec p)]
+       [`(side-condition ,p ,g ,e) ;; error
+	(error 'no-enum)]
+       [`(cross ,s)
+	(error 'no-enum)] ;; error
+       [`(list ,sub-pats ...)
+	(ormap (λ (sub-pat)
+		  (match sub-pat
+		    [`(repeat ,pat ,name ,mismatch)
+		     (rec pat)]
+		    [else (rec sub-pat)]))
+	       sub-pats)]
+       [(? (compose not pair?)) #f])))
   (define (seen? m s)
     (hash-ref m s #f))
   (define (add-seen m s)
     (hash-set m s #t))
-  (foldl (λ (nt m)
-	    (hash-set m (nt-name nt) (is-rec? nt)))
-	 (hash) nt-pats))
+  (let ([recs
+	 (foldl
+	  (λ (nt m)
+	     (hash-set m (nt-name nt) (is-rec? nt)))
+	  (hash) nt-pats)])
+    (foldl
+     (λ (nt m)
+	(let ([rhs (nt-rhs nt)])
+	  (hash-set m (nt-name nt)
+		    (map (λ (rhs)
+			    (calls-rec? rhs recs))
+			 rhs))))
+     (hash)
+     nt-pats)))
+
+;; sort-lang : lang (hash symbol -o> bool) -> lang
+(define (sort-lang nt-pats recs)
+  (sort nt-pats
+	(λ (nt1 nt2)
+	   (and (not (hash-ref recs (nt-name nt1)))
+		(hash-ref recs (nt-name nt2))))))
 
 ;; sep-names : single-pattern lang -> (assoclist symbol pattern)
 ;; identify all names and return them in a list where the earlier
@@ -150,11 +216,12 @@
   (cond [(assoc k l) l]
 	[else (cons `(,k ,v) l)]))
 
-;; (assoclist name pattern), (hash symbol pattern), pattern -> enum term
-(define (enum-names named-pats nt-pats pat)
+;; enum-names : pattern (hash symbol -o> pattern) (assoclist name pattern)
+;;              (hash symbol -o> bool) -> enum term
+(define (enum-names pat nt-pats named-pats recs)
   (let rec ([named-pats named-pats]
 	    [env (hash)])
-    (cond [(null? named-pats) (pattern/enum pat nt-pats env)]
+    (cond [(null? named-pats) (pattern/enum pat nt-pats env recs)]
 	  [else
 	   (match
 	     (car named-pats)
@@ -179,7 +246,7 @@
 		    sepd
 		    [`((named ,name ,n-term) ,term)
 		     (cons n-term term)]))
-	       (dep/enum (pattern/enum pat nt-pats env)
+	       (dep/enum (pattern/enum pat nt-pats env recs)
 			 (λ (term)
 			    (rec (cdr named-pats)
 				 (hash-set env
@@ -189,11 +256,10 @@
 
 ;; 2 passes, first identify the names
 ;; then make the enumerators dependent on the names
-;; pattern lang (hash symbol term) -> enum term
-(define (pattern/enum pat nt-pats named-terms)
+;; pattern lang (hash symbol -o> term) (hash symbol -o> bool) -> enum term
+(define (pattern/enum pat nt-pats named-terms recs)
   (let loop ([pat pat]
 	     [n 0])
-#;    (displayln pat)
     (unless (< n 100)
       (error 'inf-prob))
     (match-a-pattern
@@ -220,14 +286,25 @@
      [`hole
       (const/enum 'hole)]
      [`(nt ,id)
-      (thunk/enum
-       +inf.f ;; definitely wrong!
-       (λ ()
-	  (apply sum/enum
-		 (map
-		  (λ (rhs)
-		     (pat/enum (rhs-pattern rhs) nt-pats))
-		  (lookup nt-pats id)))))]
+      (cond [(hash-ref recs id)
+	     (thunk/enum
+	      +inf.f
+	      (λ ()
+		 (apply sum/enum
+			(map
+			 (λ (rhs)
+			    (pat/enum (rhs-pattern rhs)
+				      nt-pats
+				      recs))
+			 (lookup nt-pats id)))))]
+	    [else
+	     (apply sum/enum
+		    (map
+		     (λ (rhs)
+			(pat/enum (rhs-pattern rhs)
+				  nt-pats
+				  recs))
+		     (lookup nt-pats id)))])]
      [`(name ,name ,pat)
       (const/enum (hash-ref named-terms name))]
      [`(mismatch-name ,name ,pat)
