@@ -14,12 +14,33 @@
 ;; single-pattern = sexp
 
 
+;; find-recs test
+(define-language recL
+  (n v)
+  (e (e e)
+     (λ v e)
+     number)
+  (v variable)
+  (ee (e_1 e_1)))
+
+(define reclang (compiled-lang-lang recL))
+
+(let ([recs (find-recs reclang)])
+  (test-begin
+   (check-false (hash-ref recs 'n))
+   (check-false (hash-ref recs 'v))
+   (check-true (hash-ref recs 'e))
+   (check-true (hash-ref recs 'ee))))
+
 (define-language L
   (e (e_1 e_1)
-     variable
-
-	 )
+     variable)
   (n number))
+
+(define lang1 (compiled-lang-lang L))
+
+(test-begin
+ )
 
 (define eterms (pat/enum `(nt e) (compiled-lang-lang L)))
 #;(define nterms (pat/enum `(list (name e_1 (nt e)) number (name e_1 (nt e))) (compiled-lang-lang L)))

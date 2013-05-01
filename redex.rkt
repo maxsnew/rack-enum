@@ -7,7 +7,9 @@
 (provide decomposition
 	 pat/enum
 	 sep-names
-	 pattern/enum)
+	 pattern/enum
+	 find-recs
+	 lookup)
 
 (struct decomposition (ctx term))
 
@@ -21,6 +23,66 @@
   (enum-names (sep-names pat nt-pats)
 	      nt-pats
 	      pat))
+
+;; find-recs : lang -> (hash symbol -o> bool)
+;; Identifies which non-terminals are recursive
+(define (find-recs nt-pats)
+  (define is-rec?
+    (case-lambda
+      [(n) (is-rec? n (hash))]
+      [(nt seen)
+       (or (seen? seen (nt-name nt))
+	   (ormap
+	    (λ (rhs)
+	       (let rec ([pat (rhs-pattern rhs)])
+		 (match-a-pattern
+		  pat
+		  [`any #f]
+		  [`number #f]
+		  [`string #f]
+		  [`natural #f]
+		  [`integer #f]
+		  [`real #f]
+		  [`boolean #f]
+		  [`variable #f]
+		  [`(variable-except ,s ...) #f]
+		  [`(variable-prefix ,s) #f]
+		  [`variable-not-otherwise-mentioned #f]
+		  [`hole #f]
+		  [`(nt ,id)
+		   (is-rec? (make-nt
+			     id
+			     (lookup nt-pats id))
+			    (add-seen seen
+				      (nt-name nt)))]
+		  [`(name ,name ,pat)
+		   (rec pat)]
+		  [`(mismatch-name ,name ,pat)
+		   (rec pat)]
+		  [`(in-hole ,p1 ,p2)
+		   (or (rec p1)
+		       (rec p2))]
+		  [`(hide-hole ,p) (rec p)]
+		  [`(side-condition ,p ,g ,e) ;; error
+		   (error 'no-enum)]
+		  [`(cross ,s)
+		   (error 'no-enum)] ;; error
+		  [`(list ,sub-pats ...)
+		   (ormap (λ (sub-pat)
+			     (match sub-pat
+			       [`(repeat ,pat ,name ,mismatch)
+				(rec pat)]
+			       [else (rec sub-pat)]))
+			  sub-pats)]
+		  [(? (compose not pair?)) #f])))
+	    (nt-rhs nt)))]))
+  (define (seen? m s)
+    (hash-ref m s #f))
+  (define (add-seen m s)
+    (hash-set m s #t))
+  (foldl (λ (nt m)
+	    (hash-set m (nt-name nt) (is-rec? nt)))
+	 (hash) nt-pats))
 
 ;; sep-names : single-pattern lang -> (assoclist symbol pattern)
 ;; identify all names and return them in a list where the earlier
