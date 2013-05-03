@@ -239,7 +239,7 @@
 	     (car named-pats)
 	     ;; named repeat
 	     [`(,name name-r)
-	      (dep/enum nats
+	      (dep2/enum nats
 			(λ (n)
 			   (rec (cdr named-pats)
 				(hash-set env
@@ -251,20 +251,24 @@
 	     ;; named/mismatch
 	     [`(,name ,pat)
 	      (map/enum
+	       cdr
+	       #;
 	       (λ (named)
+		  
+		  #;
 		  `((named ,name ,(car named)) ,(cdr named)))
 	       (λ (sepd)
 		  (match
 		    sepd
 		    [`((named ,name ,n-term) ,term)
 		     (cons n-term term)]))
-	       (dep2/enum 26
+	       (dep2/enum
 		(pattern/enum pat nt-pats env rec-nt-terms)
-			 (λ (term)
-			    (rec (cdr named-pats)
-				 (hash-set env
-					   name
-					   term)))))]
+		(λ (term)
+		   (rec (cdr named-pats)
+			(hash-set env
+				  name
+				  term)))))]
 	     [else (error 'bad-assoc)])])))
 
 ;; 2 passes, first identify the names
@@ -347,7 +351,7 @@
 	(λ (sub-pat)
 	   (match sub-pat
 	     [`(repeat ,pat #f #f)
-	      (dep/enum
+	      (dep2/enum
 	       nats
 	       (λ (n)
 		  (build-list n (const (loop pat (+ n 1))))))]

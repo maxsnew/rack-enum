@@ -39,9 +39,9 @@
 (define lang1 (compiled-lang-lang L))
 
 (define eterms (pat/enum `(nt e) (compiled-lang-lang L)))
-#;(define nterms (pat/enum `(list (name e_1 (nt e)) number (name e_1 (nt e))) (compiled-lang-lang L)))
+(define nterms (pat/enum `(list (name e_1 (nt e)) number (name e_1 (nt e))) (compiled-lang-lang L)))
 
-(define confidence 10)
+(define confidence 1000)
 (define-simple-check (check-enum-prop e p)
   (for ([i (range confidence)])
     (check-true (p (decode e i)))))
@@ -57,13 +57,13 @@
 		       [`(λ ,v ,e) (symbol? v)]
 		       [`(,e1 ,e2) #t]
 		       [else #f])))
-#; (check-equal? (size nterms) +inf.f)
+ #; (check-equal? (size nterms) +inf.f)
  #;
  (check-enum-prop nterms
-		  (λ (t)
-		     (match t
-		       [`((named e_1 ,e1) (,e1 ,n ,e1)) (number? n)]
-		       [else #f])))
+ (λ (t)
+ (match t
+ [`((named e_1 ,e1) (,e1 ,n ,e1)) (number? n)]
+ [else #f])))
  )
 
 
