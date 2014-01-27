@@ -42,5 +42,9 @@
    (decode jdg-nat/e (+ i 10007))))
 
 (time
- (for/list ([i (in-range 1)])
-   (generate-term L #:satisfying (sum nat_1 nat_2 nat_3) 10007)))
+ (for/list ([i (in-range 100)])
+   (generate-term L
+                  #:satisfying
+                  (sum nat_1 nat_2 nat_3)
+                  (judgment-holds (sum nat_1 nat_2 nat_3))
+                  10007)))
