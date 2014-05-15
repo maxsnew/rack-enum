@@ -2,7 +2,10 @@
 
 (require racket/draw 
          redex/private/enumerator
-         slideshow/code)
+         slideshow/code
+         "../enum-util.rkt"
+         "../results/plot.rkt"
+         "../util.rkt")
 (slide (t "Enumerating Countable Sets for Property-Based Testing"))
 
 ;; Motivation
@@ -12,12 +15,12 @@
 (slide #:title "Enumeration"
        (t "An enumeration consists of")
        (item "A Cardinality (natural number or infinite)")
-       (item "An encode function : a → Nat")
-       (item "A decode function : Nat → a"))
+       (item "An encoding function to-nat  : a → Nat")
+       (item "A decoding function from-nat : Nat → a"))
 
 (slide #:title "Examples"
        (item "Natural numbers: infinite, identity, identity")
-       (item "Booleans: 2, 0 → true and 1 → false")
+       (item "Booleans: 2, 0 ↔ true and 1 ↔ false")
        (item "Integers: infinite, ...")
        'next
        (para "Manually constructing such bijections is tricky, prefer combinators"))
@@ -47,6 +50,7 @@
        (item "Efficient (produced enumerations should have linear complexity in the length of the bitstring of the input number)")
        (item "Fair (not favor one of the argument enumerations over others)"))
 
+;; TODO: better version of this...
 (define (enum-col e n)
   
   (define to-str number->string)
@@ -139,6 +143,8 @@
        (t "More on this later..."))
 
 (slide #:title "Recursion"
+       (code (fix/e (λ (l/e) (disj-sum/e (fin/e '())
+                                         (cons/e nat/e l/e)))))
        (t "TODO: fix/e")
        (t "TODO: thunk/e for mutual recursion")
        (t "TODO: caveats: order matters, we can't figure out size for you"))
@@ -155,13 +161,10 @@
        (t "except/e : enum a, a → enum a"))
 
 ;; How
+
 (slide #:title "Applications"
        (item "Testing")
        (item "Games"))
-
-(slide #:title "PLT Redex"
-       (item "DSL for Formal Semantics")
-       (item "Debugging formal languages"))
 
 (slide #:title "Exotic patterns"
        'alts
@@ -176,9 +179,41 @@
                )
               )))
 
+(slide #:title "Evaluation"
+       (item "What's the best way to use enumerations for testing?")
+       (item "How does the enumeration compare to (ad-hoc) random generators?"))
+
+(slide #:title "Enumeration Generation"
+       'alts
+       (list
+        (list
+         (item "In-order enumeration")
+         (item "Known technique: see SmallCheck")
+         (item "Deterministic"))
+        (list
+         (item "Random natural number indexing into an enumeration")
+         (item "How to select a natural number?")
+         (item "Sample from a geometric distribution, then pick an index between 2^n, 2^(n+1)")
+         (item "Sensitive to the probability of 0, branching factor of the grammar"))))
+
+(slide #:title "Comparison"
+       (item "3 techniques: Old Random Generator, Random natural indexing, In-order enumeration")
+       (item "6 Redex models with 3-9 bugs each"))
+
+(slide #:title "Raw Results"
+       (bitmap (make-object bitmap% "../pict_3.png")))
+
+
+
 (slide #:title "Fairness...")
 ;; Who
-#;
+(slide #:title "Related Work"
+       (item "Enumeration")
+       (subitem "Paul Tarau. Bijective Term Encodings.") (comment "Doesn't handle dependency or finite terms")
+       (subitem "Duregård et al. FEAT: Functional Enumeration of Algebraic Types") (comment "Doesn't handle dependency")
+       (item "Automated Testing")
+       (subitem "Runciman et al. SmallCheck and Lazy SmallCheck")
+       (subitem ""))
 (slide #:title "Thanks"
        (item "Robby Findler")
        (item "Paul Tarau")
