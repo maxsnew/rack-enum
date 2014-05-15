@@ -1,22 +1,24 @@
 #lang slideshow
 
-(require slideshow/code)
-(slide (t "Enumerating Countable Sets for Property-Based Testing")
-       'next
-       (t "...in PLT Redex"))
+(require racket/draw 
+         redex/private/enumerator
+         slideshow/code)
+(slide (t "Enumerating Countable Sets for Property-Based Testing"))
 
 ;; Motivation
-(slide #:title "TODO: Intro/Motivation")
+(slide (t "First, a demo"))
 
 ;; What
 (slide #:title "Enumeration"
        (t "An enumeration consists of")
        (item "A Cardinality (natural number or infinite)")
        (item "An encode function : a → Nat")
-       (item "A decode function : Nat → a")
-       'next
-       (para "Represent as struct in Racket")
-       (code (struct enum (size from to)))
+       (item "A decode function : Nat → a"))
+
+(slide #:title "Examples"
+       (item "Natural numbers: infinite, identity, identity")
+       (item "Booleans: 2, 0 → true and 1 → false")
+       (item "Integers: infinite, ...")
        'next
        (para "Manually constructing such bijections is tricky, prefer combinators"))
 
@@ -24,15 +26,14 @@
        'alts
        (list
         (list
-         (t "We want to enumerate Algebraic Data Types:")
-         (code (define-language λc
-                 (e ::= (e e)
-                        (λ (x) e)
-                        x)
-                 (x ::= variable-not-otherwise-mentioned)))
-         (para "Need support for alternatives (disjoint union), tuples (product), recursion (fix points)"))
+         (code (define-language rbtrees
+                 (tree ::= empty
+                           (node color val tree tree))))
+                 
+         (para "Need support for alternatives, tuples, recursion (fix points)"))
         (list
          (t "Redex also supports more exotic types")
+         ;; TODO: change this to be a table of pattern <-> combinator feature
          (code (define-language exotic
                  (the-same     ::= (num_1 num_1))
                  (different    ::= (num_!_1 num_!_1))
@@ -43,31 +44,48 @@
 
 (slide #:title "Design Goals"
        (t "Combinators should be")
-       'next
-       (item "Efficient (log of the size of the term)")
+       (item "Efficient (produced enumerations should have linear complexity in the length of the bitstring of the input number)")
        (item "Fair (not favor one of the argument enumerations over others)"))
 
+(define (enum-col e n)
+  
+  (define to-str number->string)
+  (foldr vl-append 
+         (blank)
+         (for/list ([x (in-list (approximate e n))])
+           (text (to-str x)))))
 (slide #:title "Sum"
        (item "Set interpretation: Disjoint union")
-       (item "Given two enumerations as and bs, produce an enumeration of either as or bs")
-       'next
-       (item "In order to distinguish between elements when encoding, have the user provide predicates that identify the elements")
-       'next
+       (item "disj-sum/e : enum a, enum b → enum (a or b)")
        (code (define int-or-char/e 
-               (disj-sum/e (cons int/e integer?)
-                           (cons char/e character?)))))
-
+               (disj-sum/e int/e char/e)))
+       'next
+       )
+(define neg/e 
+  (map/e (λ (x) (sub1 (- x)))
+         (λ (x) (- (add1 x)))
+         nat/e))
 (slide #:title "Sum Example"
        (t "First consider only infinite enumerations")
-       (t "TODO: show the ordering of a sum of enumerations"))
+       'alts
+       (list 
+        (list
+         (htl-append (enum-col nat/e 10)
+                   (enum-col neg/e 10)))
+        (list (enum-col (disj-sum/e (cons nat/e number?) (cons neg/e number?)) 20))))
+
+(slide #:title "from-nat"
+       (t "Just check if it's even or odd (constant time)"))
 
 (slide #:title "Nested Sum"
+       
        (t "TODO: show why nested sum is unfair"))
 
 (slide #:title "Sum, redefined"
-       (t "Given n enumerations, produce enumerations of any of them"))
+       (item "disj-sum/e : enum a_1, enum a_2, ... → enum (a_1 or a_2 or ...)"))
 
 (slide #:title "Sum of many"
+       (t "TODO: ")
        )
 
 (slide #:title "Sums of Finite Enumerations"
@@ -75,7 +93,7 @@
 
 (slide #:title "Product"
        (item "Set interpretation: Cartesian Product")
-       (item "Given two enumerations as and bs, produce an enumeration of pairs of as and bs")
+       (item "cons/e : enum a, enum b → enum (a, b)")
        'next
        (code (define int-and-char/e (cons/e int/e char/e))))
 
@@ -126,11 +144,15 @@
        (t "TODO: caveats: order matters, we can't figure out size for you"))
 
 (slide #:title "Dependence"
-       (t "Set interpretation: countable union")
-       (t "Type theory interpretation: Dependent product")
+       (t "Set interpretation: union of an indexed family of sets")
        (t "TODO: ")
        (t "Slow on some inputs!"))
 
+(slide #:title "Filter"
+       (t "Set interpretation: subset")
+       (t "General filter is slow/hard")
+       (t "But removing finitely many (known) elements is easy!")
+       (t "except/e : enum a, a → enum a"))
 
 ;; How
 (slide #:title "Applications"
@@ -141,25 +163,6 @@
        (item "DSL for Formal Semantics")
        (item "Debugging formal languages"))
 
-(slide #:title "Algebraic Data Types"
-       (item "Map directly to combinators")
-       'alts
-       (list
-        (list 
-         (code (define-language λc
-               (e ::= (e e)
-                      (λ (x) e)
-                      x)
-               (x ::= variable-not-otherwise-mentioned))))
-        (list 
-         (code (define e/e (disj-sum/e (x/e . x?)
-                                       ((list/e (fin/e λ)
-                                                (list/e x/e)
-                                                e/e)
-                                        . lam?)
-                                       ((list/e e/e e/e)
-                                        . app?)))
-               (define x/e var/e)))))
 (slide #:title "Exotic patterns"
        'alts
        (list
